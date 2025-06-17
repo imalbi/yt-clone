@@ -1,4 +1,4 @@
-<script>
+<script lang="ts">
 import { items } from "$lib/menuItems";
 
 </script>
@@ -8,6 +8,7 @@ import { items } from "$lib/menuItems";
     {#each items as item}
         <a 
             href={item.ref} 
+            data-sveltekit-prefetch="off"
             class="flex flex-col items-center justify-center h-20 w-20 gap-1 rounded-xl bg-gray-100 hover:bg-gray-200 cursor-pointer"
         >
             <span class="w-6 h-6">
