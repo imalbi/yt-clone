@@ -2,49 +2,7 @@
 let sampleImg="/media/hq720.avif";
 let avatar= "/media/avatar.webp";
 export let video;
-
-export function formatTimeAgo(isoDateString:string) {
-  if (!isoDateString) return '';
-
-  const now = new Date();
-  const past = new Date(isoDateString);
-  
-  // Differenza in secondi
-  const secondsAgo = Math.floor((now.getTime() - past.getTime()) / 1000);
-
-  // Meno di un minuto
-  if (secondsAgo < 60) {
-    return "pochi secondi fa";
-  }
-
-  // Meno di un'ora
-  if (secondsAgo < 3600) {
-    const minutes = Math.floor(secondsAgo / 60);
-    return minutes === 1 ? '1 minuto fa' : `${minutes} minuti fa`;
-  }
-
-  // Meno di 24 ore
-  if (secondsAgo < 86400) {
-    const hours = Math.floor(secondsAgo / 3600);
-    return hours === 1 ? '1 ora fa' : `${hours} ore fa`;
-  }
-
-  // Meno di un mese (circa 30 giorni)
-  if (secondsAgo < 2592000) {
-    const days = Math.floor(secondsAgo / 86400);
-    return days === 1 ? '1 giorno fa' : `${days} giorni fa`;
-  }
-
-  // Meno di un anno (circa 365 giorni)
-  if (secondsAgo < 31536000) {
-    const months = Math.floor(secondsAgo / 2592000);
-    return months === 1 ? '1 mese fa' : `${months} mesi fa`;
-  }
-
-  // Più di un anno
-  const years = Math.floor(secondsAgo / 31536000);
-  return years === 1 ? '1 anno fa' : `${years} anni fa`;
-}
+import { formatTimeAgo } from "$lib/scripts/scripts";
 
 </script>
 

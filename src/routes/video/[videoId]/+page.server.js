@@ -2,7 +2,7 @@ import { PUBLIC_YOUTUBE_API_KEY } from '$env/static/public';
 
 const BASE_URL = 'https://www.googleapis.com/youtube/v3';
 
-// La firma corretta: riceviamo l'oggetto `params`
+
 export async function load({ fetch, params }) {
     if (!PUBLIC_YOUTUBE_API_KEY) {
         throw new Error("Api Key non è stata configurata");
@@ -14,10 +14,11 @@ export async function load({ fetch, params }) {
     console.log(`Caricamento dati per il video con ID: ${videoId}`);
 
     try {
-        // --- CHIAMATA 1: OTTENERE I DETTAGLI DEL VIDEO ---
+        //  CHIAMATA 1: VIDEO DATA BY ID 
         const videoResponse = await fetch(
             `${BASE_URL}/videos?part=snippet,statistics,contentDetails&id=${videoId}&key=${PUBLIC_YOUTUBE_API_KEY}`
         );
+
         if (!videoResponse.ok) {
             const errorDetails = await videoResponse.json();
             throw new Error(`Errore API (video): ${errorDetails.error.message}`);
@@ -29,7 +30,7 @@ export async function load({ fetch, params }) {
         }
         const videoDetails = videoData.items[0];
 
-        // --- CHIAMATA 2: OTTENERE I DETTAGLI DEL CANALE ---
+        // --- CHIAMATA 2: CHANNEL DATA BY ID ---
         const channelId = videoDetails.snippet.channelId;
         const channelResponse = await fetch(
             `${BASE_URL}/channels?part=snippet,statistics&id=${channelId}&key=${PUBLIC_YOUTUBE_API_KEY}`
@@ -45,10 +46,23 @@ export async function load({ fetch, params }) {
         }
         const channelDetails = channelData.items[0];
 
-        // --- OGGETTO DI RITORNO PULITO ---
+        // -- CHIAMATA 3: COMMENTS BY VIDEO-ID
+        const commentsResponse=await fetch(
+            `${BASE_URL}/commentThreads?part=snippet%2Creplies&videoId=${videoId}&key=${PUBLIC_YOUTUBE_API_KEY}`
+        )
+        if (!commentsResponse.ok) {
+            const errorDetails = await commentsResponse.json();
+            throw new Error(`Errore API (commenti): ${errorDetails.error.message}`);
+        }
+
+        const commentsData = await commentsResponse.json();
+        const commentsDetails= commentsData.items;
+
+        // --- OGGETTO DI RITORNO CON TUTTI I RISULTATI ---
         return {
             video: videoDetails,
-            channel: channelDetails
+            channel: channelDetails,
+            comments: commentsDetails
         };
 
     } catch (e) {

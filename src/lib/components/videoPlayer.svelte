@@ -1,84 +1,61 @@
 <script lang="ts">
-    import RecommendedVideos from "./RecommendedVideos.svelte";
-    export let data;
+  import DescriptionBox from './DescriptionBox.svelte';
 
-    const src = `https://www.youtube.com/embed/${data.video.id}`;
-    const videoData= data.video;
+    import { formatSubscriberCount } from "$lib/scripts/scripts";
+    
+    let {data} = $props();
+    const src = $derived(`https://www.youtube.com/embed/${data.video.id}`);
+    const videoData= $derived(data.video);
 
-    console.log(data);
-    // File: src/lib/utils/formatters.js
 
-    /**
-     * Formatta un numero di iscritti secondo regole specifiche (Mila, Mln).
-     * @param {string | number} subs Il numero di iscritti, può essere una stringa o un numero.
-     * @returns {string} Il numero formattato come stringa.
-     */
-    export function formatSubscriberCount(subs:string) {
-    // Per prima cosa, ci assicuriamo di lavorare con un numero intero.
-    const num = parseInt(subs, 10);
+    //FORMAT DATA
+    function formatData(dataIn:string) {
+        const dataPubblicazione = new Date(dataIn);
+        
+        const opzioniDiFormattazione = {
+            day: '2-digit' as const,
+            month: 'short' as const,
+            year: 'numeric' as const
+        };
+        const formattatore =new Intl.DateTimeFormat('it-IT', opzioniDiFormattazione);
+        const stringaFormattata = formattatore.format(dataPubblicazione);
+        return stringaFormattata;
 
-    // Se l'input non è un numero valido, restituiamo una stringa vuota.
-    if (isNaN(num)) {
-        return '';
-    }
-
-    // Regola 1: Sotto i 100.000, formato standard con il punto delle migliaia.
-    // Esempio: 99999 -> "99.999"
-    if (num < 100000) {
-        // Usiamo l'API Intl.NumberFormat per formattare correttamente in italiano.
-        return new Intl.NumberFormat('it-IT').format(num);
-    }
-
-    // Regola 2: Tra 100.000 e 1 milione (escluso), formato "nnn mila".
-    // Esempio: 123456 -> "123 mila"
-    if (num < 1000000) {
-        // Dividiamo per 1000 e arrotondiamo per difetto per ottenere solo la parte intera.
-        const thousands = Math.floor(num / 1000);
-        return `${thousands} mila`;
     }
     
-    // Regola 3: Da 1 milione in su, formato "n,nn Mln".
-    if (num >= 1000000) {
-        const millions = num / 1000000;
-        let formattedMillions;
 
-        // Decidiamo quanti decimali mostrare per un look più pulito
-        if (millions < 10) {
-        // Sotto i 10 milioni, usiamo due decimali per maggiore precisione.
-        formattedMillions = millions.toFixed(2);
-        } else {
-        // Sopra i 10 milioni, un solo decimale è sufficiente.
-        formattedMillions = millions.toFixed(1);
-        }
-
-        // Se il risultato è "10.0", rimuoviamo lo ".0" finale.
-        if (formattedMillions.endsWith('.0')) {
-        formattedMillions = formattedMillions.slice(0, -2);
-        }
-
-        // Sostituiamo il punto con la virgola per lo stile italiano e aggiungiamo "Mln".
-        return `${formattedMillions.replace('.', ',')} Mln`;
-    }
     
-    // Fallback per qualsiasi caso non previsto (anche se non dovrebbe succedere).
-    return new Intl.NumberFormat('it-IT').format(num);
-    }
 </script>
+{#if data&&data.video&&data.channel}
+    <div class="flex flex-col gap-2 w-full">
+        <iframe class="aspect-video rounded-2xl" id="ytplayer" title="Video" {src} frameborder="0"></iframe>
 
-<div class="flex flex-col">
-    <iframe class="w-full rounded-2xl" id="ytplayer" width="640" height="360" title="Video" {src} frameborder="0"></iframe>
+        <h1 class= "font-bold text-xl">{data.video.title}{videoData.snippet.title}</h1>
+        <div class="flex flex-row justify-between">
+            <div class="flex flex-row gap-2 mt-2">
+                <img class="rounded-full contain-content size-14" src={data.channel.snippet.thumbnails.default.url} alt="Channel Avatar">
+                <div class="flex flex-col ">
+                    <h2 class="font-bold ">{data.channel.snippet.title}</h2>
+                    <p class="font-light text-gray-600">{formatSubscriberCount(data.channel.statistics.subscriberCount)} di iscritti</p>
 
-    <div>
-        <h1>{data.video.title}{videoData.snippet.title}</h1>
-        <img src={data.channel.snippet.thumbnails.default.url} alt="Channel Avatar">
-        <h2>{data.channel.snippet.title}</h2>
-        <p>{formatSubscriberCount(data.channel.statistics.subscriberCount)}</p>
-        <p>
-            
-            {videoData.snippet.description}
-            
-        </p>
+                </div>
+                <button class="rounded-3xl bg-black text-white px-4 py-2 h-fit font-semibold cursor-pointer align-middle">Iscriviti</button>
+            </div>
+
+            <div class=" md:flex mr-10 h-12 hidden ">
+                <button class="bg-gray-200 hover:bg-gray-300 rounded-l-full cursor-pointer px-2"> Su {formatSubscriberCount(videoData.statistics.likeCount)} </button>
+                <button class="bg-gray-200 hover:bg-gray-300 rounded-r-full cursor-pointer px-2"> Giu </button>
+                <button class="bg-gray-200 hover:bg-gray-300 rounded-full px-3 py-1 cursor-pointer ml-3"> Condividi </button>
+                <button class="bg-gray-200 hover:bg-gray-300 rounded-full px-3 py-1 cursor-pointer ml-3"> Scarica </button>
+                <button class="bg-gray-200 hover:bg-gray-300 rounded-full size-12 cursor-pointer ml-3 pb-4 font-bold text-2xl"> ... </button>
+            </div>
+        </div>
+        <div class="rounded-2xl bg-gray-200 p-3 cursor-pointer">
+            <h3>{formatSubscriberCount(videoData.statistics.viewCount)} visualizzazioni  {formatData(videoData.snippet.publishedAt)}</h3>
+            <DescriptionBox description={videoData.snippet.description}></DescriptionBox>
+        </div>
+
     </div>
-    <RecommendedVideos video={data} />
-
-</div>
+{:else}
+<p>Video non trovato o dati mancanti</p>
+{/if}

@@ -4,7 +4,7 @@ import { items } from "$lib/menuItems";
 </script>
 
 
-<nav class="flex flex-col gap-3 pt-4 ">
+<nav class="flex flex-col gap-3 pt-4 " id="side-bar-main">
     {#each items as item}
         <a 
             href={item.ref} 
