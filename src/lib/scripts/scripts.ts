@@ -29,7 +29,7 @@ export function formatSubscriberCount(subs:string) {
     }
     
     // Regola 3: Da 1 milione in su, formato "n,nn Mln".
-    if (num >= 1000000) {
+    if (num < 1000000000) {
         const millions = num / 1000000;
         let formattedMillions;
 
@@ -49,6 +49,22 @@ export function formatSubscriberCount(subs:string) {
 
         // Sostituiamo il punto con la virgola per lo stile italiano e aggiungiamo "Mln".
         return `${formattedMillions.replace('.', ',')} Mln`;
+    }
+
+    // Regola 4: Da 1 miliardo in su, formato "n,n Mld".
+    if (num >= 1000000000) {
+        const billions = num / 1000000000;
+        let formattedBillions;
+
+        formattedBillions = billions.toFixed(1);
+
+        // Se il risultato è "10.0", rimuoviamo lo ".0" finale.
+        if (formattedBillions.endsWith('.0')) {
+        formattedBillions = formattedBillions.slice(0, -2);
+        }
+
+        // Sostituiamo il punto con la virgola per lo stile italiano e aggiungiamo "Mln".
+        return `${formattedBillions.replace('.', ',')} Mld`;
     }
     
     // Fallback per qualsiasi caso non previsto (anche se non dovrebbe succedere).

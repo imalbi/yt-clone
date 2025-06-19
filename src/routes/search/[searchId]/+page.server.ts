@@ -35,7 +35,7 @@ export async function load({fetch, params}) {
         const finalResults = videoData.items.map(video => ({
             videoId: video.id,
             title: video.snippet.title,
-            thumbnail: video.snippet.thumbnails.high.url,
+            thumbnail: video.snippet.thumbnails.maxres.url,
             publishedAt: video.snippet.publishedAt,
             viewCount: video.statistics.viewCount,
             likeCount: video.statistics.likeCount,
