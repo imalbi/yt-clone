@@ -4,7 +4,7 @@ import { formatSubscriberCount, formatTimeAgo } from "$lib/scripts/scripts";form
 
 </script>
 
-<a href="/video/{video.id}">
+<a href="/video/{video.id}" class="mb-2 mt-1">
     <article class="rounded-2xl p-2  hover:bg-gray-200 cursor-pointer">
         <div>
             <img class="rounded-2xl w-full" src={video.snippet.thumbnails.maxres.url} alt="Thumbnail">
