@@ -1,7 +1,4 @@
 
-
-
-
 /**
  * Formatta un numero di iscritti secondo regole specifiche (Mila, Mln).
  * @param {string | number} subs Il numero di iscritti, può essere una stringa o un numero.

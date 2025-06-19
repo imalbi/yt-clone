@@ -70,6 +70,7 @@ export async function load({ fetch, params }) {
         return { 
             video: null,
             channel: null,
+            comments: null,
             error: e instanceof Error ? e.message : String(e)
         };
     }

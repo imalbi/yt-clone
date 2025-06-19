@@ -7,6 +7,8 @@
     let {data} = $props();
     const video=page.url.pathname.split("/").pop();
 
+    
+
 
 
 </script>

@@ -1,6 +1,4 @@
 <script lang="ts">
-let sampleImg="/media/hq720.avif";
-let avatar= "/media/avatar.webp";
 export let video;
 import { formatTimeAgo } from "$lib/scripts/scripts";
 

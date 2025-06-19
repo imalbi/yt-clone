@@ -6,6 +6,8 @@
 	import { page } from "$app/state";
 
 	let isMenuOpen = $state(false);
+
+	let inputSearch = $state('');
 	
 	
 	function handleToggleMenu(){
@@ -19,7 +21,7 @@
 
 
 
-<TopBar onToggle={handleToggleMenu}/>
+<TopBar onToggle={handleToggleMenu} {inputSearch}/>
 <div class="flex flex-row">
 	{#if !page.url.pathname.startsWith("/video/")}
     <aside class="w-30"><SideBar></SideBar></aside>
