@@ -7,7 +7,7 @@
     console.log(JSON.stringify(data.video.statistics));
 </script>
 
-<div class="bg-gray-200 rounded-2xl p-4 flex flex-col gap-3 mt-10">
+<div class="bg-gray-100 rounded-2xl p-4 flex flex-col gap-3 mt-10">
   {#await data.streamed.comments}
     <p>Caricamento dei commenti</p>
   {:then comments} 

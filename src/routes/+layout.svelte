@@ -33,7 +33,6 @@
 </script>
 
 
-<body class="bg bg-gray-100 opacity-70">
 
 
 <TopBar onToggle={handleToggleMenu} {inputSearch}/>
@@ -51,5 +50,5 @@
 <aside>
 </aside>
 <SideBarOverlay isOpen={isMenuOpen} close={handleToggleMenu}></SideBarOverlay>
-</body>
+
 

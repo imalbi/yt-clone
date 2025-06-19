@@ -57,7 +57,7 @@
                 <button class="bg-gray-100 hover:bg-gray-300 rounded-full size-12 cursor-pointer ml-3 pb-4 font-bold text-2xl hidden md:block"> ... </button>
             </div>
         </div>
-        <div class="rounded-2xl bg-gray-200 p-3 cursor-pointer">
+        <div class="rounded-2xl bg-gray-100 p-3 cursor-pointer">
             <h3>{formatSubscriberCount(videoData.statistics.viewCount)} visualizzazioni  {formatData(videoData.snippet.publishedAt)}</h3>
             <DescriptionBox description={videoData.snippet.description}></DescriptionBox>
         </div>
