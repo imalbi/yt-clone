@@ -1,6 +1,6 @@
 <script lang="ts">
 let {video} = $props();
-import { formatTimeAgo } from "$lib/scripts/scripts";
+import { formatSubscriberCount, formatTimeAgo } from "$lib/scripts/scripts";formatSubscriberCount
 
 </script>
 
@@ -14,7 +14,7 @@ import { formatTimeAgo } from "$lib/scripts/scripts";
             <div class="flex flex-col">
                 <h1 class="text-2xl font-semibold line-clamp-2">{video.snippet.title}</h1>
                 <p class=" text-gray-600">{video.snippet.channelTitle}</p>
-                <p class="text-gray-600">{video.statistics.viewCount} visualizzazioni • {formatTimeAgo(video.snippet.publishedAt)}</p>
+                <p class="text-gray-600 tracking-tight ">{formatSubscriberCount(video.statistics.viewCount)} visualizzazioni • {formatTimeAgo(video.snippet.publishedAt)}</p>
             </div>
         </div>
     </article>
