@@ -71,8 +71,8 @@
     
     <div class="flex items-center flex-shrink-0 order-2">
         <form class="flex" {onsubmit}>
-        <input bind:value={inputSearch} class="hidden md:block rounded-l-3xl border border-gray-300 h-10 w-[25vw]" type="text" placeholder="Cerca">
-        <button type="submit" class="cursor-pointer rounded-full bg-#F0F0F0 border border-gray-300 h-10 p-2 hover:bg-gray-200
+        <input bind:value={inputSearch} class="hidden md:block rounded-l-3xl border border-gray-100 h-10 w-[25vw]" type="text" placeholder="Cerca">
+        <button type="submit" class="cursor-pointer rounded-full bg-#F0F0F0 border border-gray-100 h-10 p-2 hover:bg-gray-200
         md:rounded-r-full md:rounded-l-none md:borderl-l-0"
         onclick={showSearch}
         ><img class="w-6 p-1"src="/media/search.svg" alt="Cerca Bottone"></button>
