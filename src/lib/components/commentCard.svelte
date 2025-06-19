@@ -1,8 +1,7 @@
 <script lang="ts">
     import { formatTimeAgo } from "$lib/scripts/scripts";
-    let { comment } = $props();
+    let { commentData } = $props();
     let defaultAvatar = "/media/avatar.webp";
-    let commentData = $derived(comment.snippet.topLevelComment.snippet);
     let likes= 123; //PlaceHolder
 
     function handleImageError(e: Event) {

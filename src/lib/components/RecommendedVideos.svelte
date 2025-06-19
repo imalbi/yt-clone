@@ -1,6 +1,6 @@
 <script lang="ts">
   import { formatTimeAgo } from "$lib/scripts/scripts";
-  export let video;
+  let {video} = $props();
 
 
 </script>

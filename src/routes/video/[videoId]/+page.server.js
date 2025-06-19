@@ -3,6 +3,21 @@ import { PUBLIC_YOUTUBE_API_KEY } from '$env/static/public';
 const BASE_URL = 'https://www.googleapis.com/youtube/v3';
 
 
+/**
+ * @param {string} videoId
+ * @param {typeof fetch} fetch
+ */
+async function loadComments(videoId, fetch) {
+    // NOTA: Dovrai trovare l'endpoint corretto per i commenti nella documentazione dell'API di YouTube
+    // Di solito è 'commentThreads'
+    const commentsRes = await fetch(`${BASE_URL}/commentThreads?part=snippet&videoId=${videoId}&key=${PUBLIC_YOUTUBE_API_KEY}`);
+    if (!commentsRes.ok) {
+        throw new Error("Impossibile caricare i commenti");
+    }
+    const commentsData = await commentsRes.json();
+    return commentsData.items; // Restituisce l'array di commenti
+}
+
 export async function load({ fetch, params }) {
     if (!PUBLIC_YOUTUBE_API_KEY) {
         throw new Error("Api Key non è stata configurata");
@@ -46,23 +61,16 @@ export async function load({ fetch, params }) {
         }
         const channelDetails = channelData.items[0];
 
-        // -- CHIAMATA 3: COMMENTS BY VIDEO-ID
-        const commentsResponse=await fetch(
-            `${BASE_URL}/commentThreads?part=snippet%2Creplies&videoId=${videoId}&key=${PUBLIC_YOUTUBE_API_KEY}`
-        )
-        if (!commentsResponse.ok) {
-            const errorDetails = await commentsResponse.json();
-            throw new Error(`Errore API (commenti): ${errorDetails.error.message}`);
-        }
-
-        const commentsData = await commentsResponse.json();
-        const commentsDetails= commentsData.items;
+        const commentsPromise = loadComments(videoId, fetch);
 
         // --- OGGETTO DI RITORNO CON TUTTI I RISULTATI ---
         return {
             video: videoDetails,
             channel: channelDetails,
-            comments: commentsDetails
+            
+                streamed :{
+                    comments: commentsPromise
+                }
         };
 
     } catch (e) {

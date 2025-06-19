@@ -24,15 +24,28 @@ export async function load({fetch, params}) {
             throw new Error(`Errore API SEARCH :  ${errorDetails.error.message}`)
         }
         const responseSearch = await dataVideoId.json(); 
-        const videoIds = responseSearch.items.map((item)=>item.id.videoId).join(',');
-
-        const videoDataRaw= await fetch(`${BASE_URL}/videos?part=snippet,statistics&id=${videoIds}&key=${PUBLIC_YOUTUBE_API_KEY}`) 
+        // Fix implicit 'any' type for 'item'
+        const videoIds = responseSearch.items.map((item: any) => item.id.videoId).join(',');   const videoDataRaw= await fetch(`${BASE_URL}/videos?part=snippet,statistics&id=${videoIds}&key=${PUBLIC_YOUTUBE_API_KEY}`) 
         if(!videoDataRaw.ok){
             const errorDetails = await videoDataRaw.json();
             throw new Error(`Errore API Video LIST :  ${errorDetails.error.message}`)
         }
         const videoData = await videoDataRaw.json();
-        const finalResults = videoData.items.map(video => ({
+        const finalResults = videoData.items.map((video: {
+            id: string;
+            snippet: {
+                title: string;
+                thumbnails: { maxres: { url: string } };
+                publishedAt: string;
+                channelTitle: string;
+                channelId: string;
+                description: string;
+            };
+            statistics: {
+                viewCount: string;
+                likeCount: string;
+            };
+        }) => ({
             videoId: video.id,
             title: video.snippet.title,
             thumbnail: video.snippet.thumbnails.maxres.url,
@@ -41,7 +54,7 @@ export async function load({fetch, params}) {
             likeCount: video.statistics.likeCount,
             channelTitle: video.snippet.channelTitle,
             channelId: video.snippet.channelId,
-            description:video.snippet.description
+            description: video.snippet.description
         }));
 
         cache.set(params.searchId,finalResults);

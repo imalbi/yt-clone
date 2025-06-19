@@ -1,7 +1,6 @@
 <script lang="ts">
 import VideoCard from "$lib/components/videoCard.svelte";
-export let data;
-
+let {data} = $props();
 </script>
 {#if data.error}
     <p> <strong>Ops! Qualcosa è andato storto</strong></p>
