@@ -61,7 +61,7 @@
     </div>
     {:else}
     <div class="flex items-center md:whitespace-nowrap flex-shrink-0 ml-1">
-        <button class="flex items-center justify-center w-10 h-10 rounded-full bg-gray-100 hover:bg-gray-200 cursor-pointer"
+        <button class="flex items-center justify-center w-10 h-10 rounded-full  hover:bg-gray-200 cursor-pointer"
         onclick={onToggle}>
             <img src="/media/burger.svg" alt="Menu" class="w-6 h-6" />
         </button>
@@ -80,8 +80,8 @@
     </div>
     
     <div class="flex items-center flex-shrink-0 gap-1 order-3 mr-1">
-        <button class="flex items-center rounded-3xl h-10  bg-gray-100 hover:bg-gray-200 cursor-pointer"><img class="h-9" src="/media/add.svg" alt="">Crea</button>
-        <button class="rounded-full h-10 w-10 bg-gray-100 hover:bg-gray-200 cursor-pointer"><img class="p-2" src="/media/bell.svg" alt=""></button>
+        <button class="flex items-center rounded-3xl h-10   hover:bg-gray-200 cursor-pointer"><img class="h-9" src="/media/add.svg" alt="">Crea</button>
+        <button class="rounded-full h-10 w-10  hover:bg-gray-200 cursor-pointer"><img class="p-2" src="/media/bell.svg" alt=""></button>
         <button class="rounded-full h-10 w-10 cursor-pointer"><img class="rounded-full" src={user.img} alt=""></button>
     </div>
     

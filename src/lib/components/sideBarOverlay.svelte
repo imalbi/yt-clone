@@ -26,7 +26,7 @@
     out:fly={{ x: -256, duration: 250, easing: quintOut }}>
         
     <div class="flex items-center gap-4 whitespace-nowrap flex-shrink-0 ml-5">
-        <button class="flex items-center justify-center w-10 h-10 rounded-full bg-gray-100 hover:bg-gray-200 cursor-pointer" onclick={close}>
+        <button class="flex items-center justify-center w-10 h-10 rounded-full  hover:bg-gray-200 cursor-pointer" onclick={close}>
         <img src="/media/burger.svg" alt="Menu" class="w-6 h-6" />
         </button>
         <a href="/"><img class="h-8 " src="/media/ytlogo.svg" alt="Home"></a>
