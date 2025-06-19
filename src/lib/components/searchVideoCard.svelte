@@ -5,18 +5,28 @@
 
 </script>
 
-<a href="/video/{video.videoId}">
-    <article class="rounded-2xl p-2 bg-gray-100 hover:bg-gray-200 cursor-pointer flex gap-3 ">
-        <div class="w-100 aspect-video shrink-0">
-            <img class="rounded-2xl" src={video.thumbnail} alt="Thumbnail">
+<a href="/video/{video.videoId}" class="block"> <article class="flex flex-col sm:flex-row gap-4 rounded-lg p-2 bg-gray-100 hover:bg-gray-200 cursor-pointer">
+        
+        <div class="w-full sm:w-56 aspect-video flex-shrink-0"> 
+            <img class="w-full  object-cover rounded-md" src={video.thumbnail} alt="Thumbnail per {video.title}">
         </div>
-        <div class="flex flex-row gap-2">
-            <div class="flex flex-col">
-                <h1 class="text-2xl font-semibold">{video.title}</h1>
-                <p class=" text-gray-600">{video.channelTitle}</p>
-                <p class="text-gray-600">{formatSubscriberCount(video.viewCount)} visualizzazioni • {formatTimeAgo(video.publishedAt)}</p>
-                <p class="text-gray-600 line-clamp-2">{video.description}</p>
+        
+        <div class="flex flex-col flex-1 min-w-0">
+            <h3 class="text-lg font-bold line-clamp-1">{video.title}</h3>
+            
+            <div class="text-sm text-gray-600 mt-1">
+                <p>{video.channelTitle}</p>
+                <p>
+                    <span>{formatSubscriberCount(video.viewCount)} visualizzazioni</span>
+                    <span class="mx-1">•</span>
+                    <span>{formatTimeAgo(video.publishedAt)}</span>
+                </p>
             </div>
+
+            <p class="text-sm text-gray-500 mt-2 hidden md:line-clamp-2">
+                {video.description}
+            </p>
         </div>
+
     </article>
 </a>
