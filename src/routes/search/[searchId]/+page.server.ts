@@ -18,7 +18,7 @@ export async function load({fetch, params}) {
         throw new Error("No api key found");
     }
     try{
-        const dataVideoId = await fetch(`${BASE_URL}/search?part=snippet&maxResults=5&q=${params.searchId}&key=${PUBLIC_YOUTUBE_API_KEY}`)
+        const dataVideoId = await fetch(`${BASE_URL}/search?part=snippet&maxResults=10&q=${params.searchId}&key=${PUBLIC_YOUTUBE_API_KEY}`)
         if(!dataVideoId.ok){
             const errorDetails = await dataVideoId.json();
             throw new Error(`Errore API SEARCH :  ${errorDetails.error.message}`)
