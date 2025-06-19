@@ -35,10 +35,10 @@
 
 
 <TopBar onToggle={handleToggleMenu} {inputSearch}/>
-<div class="flex flex-row">
+<div class="flex flex-row bg-gray-100">
 	{#if page.url.pathname.startsWith("/video/")}
 		<!-- No sidebar for video pages -->
-	{:else if  (page.url.pathname.startsWith('/search/'))&&isMobile}
+	{:else if isMobile}
 		<!-- No sidebar for search on mobile -->
 	{:else}
 	<aside class="w-30"><SideBar></SideBar></aside>
