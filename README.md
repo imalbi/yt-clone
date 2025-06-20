@@ -84,7 +84,7 @@ Un clone funzionale e moderno dell'interfaccia di YouTube, costruito con SvelteK
 
 ---
 
-## 🧠 Sfide e Apprendimenti
+## 🧠 Sfide Principali
 
 - **Orchestrazione di Chiamate API Complesse e Dipendenti**
   - **Problema:**  Nella pagina di ricerca con la sola API di ricerca non è possibile ottenere tutti i dati utili per emulare il comportamento dell'orginale.
