@@ -6,7 +6,7 @@
 ![Vercel](https://img.shields.io/badge/Vercel-000000?style=for-the-badge&logo=vercel&logoColor=white)
 ![MIT License](https://img.shields.io/badge/License-MIT-green.svg?style=for-the-badge)
 
-Un clone funzionale e moderno dell'interfaccia di YouTube, costruito con SvelteKit, Tailwind CSS e l'API di YouTube. Questo progetto non si limita a replicare l'aspetto, ma implementa pattern avanzati per un'esperienza utente fluida e professionale.
+Un clone funzionale e moderno dell'interfaccia di YouTube, costruito con SvelteKit, Tailwind CSS e l'API di YouTube.
 
 ---
 
@@ -47,10 +47,7 @@ Un clone funzionale e moderno dell'interfaccia di YouTube, costruito con SvelteK
     - **Svelte Transitions** (per l'animazione `fly`)
 - **Build Tool:** Vite
 - **API:** YouTube Data API v3
-
-
 ---
-
 ## 🔧 Come Avviare il Progetto Localmente
 
 ### Prerequisiti
