@@ -1,8 +1,7 @@
 
 
 import { PUBLIC_YOUTUBE_API_KEY } from "$env/static/public";
-import { BASE_URL } from "$env/static/private";
-
+const BASE_URL = 'https://www.googleapis.com/youtube/v3';
 const cache = new Map();
 
 export async function load({fetch, params}) {

@@ -5,7 +5,6 @@
     import RecommendedVideos from "$lib/components/RecommendedVideos.svelte";
     import { mockApiResponse } from "$lib/mocks/popularVideos.js";
     import { fly} from "svelte/transition";
-    import { quintOut } from "svelte/easing";
     let {data} = $props();
     import { onMount } from "svelte";
     const video=page.url.pathname.split("/").pop();

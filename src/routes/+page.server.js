@@ -1,19 +1,11 @@
-import {PUBLIC_YOUTUBE_API_KEY,PUBLIC_USE_MOCKS} from "$env/static/public";
+import {PUBLIC_YOUTUBE_API_KEY} from "$env/static/public";
 const BASE_URL = 'https://www.googleapis.com/youtube/v3';
-import { mockApiResponse } from "$lib/mocks/popularVideos.js";
 
 
 
 export async function load({ fetch }) {
     console.log("La funzione LOAD è stata eseguita!");
-    if (PUBLIC_USE_MOCKS === 'true') {
-        console.log("Delover Mode, MOCK DATA USED");
-        
-        // Restituisce i dati finti
-        return { 
-        videos: mockApiResponse 
-        };
-    }
+    
 
 
   if(!PUBLIC_YOUTUBE_API_KEY){
