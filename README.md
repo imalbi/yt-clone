@@ -27,7 +27,7 @@ Un clone funzionale e moderno dell'interfaccia di YouTube, costruito con SvelteK
 - **Pagina di Riproduzione Video:** Player video, dettagli del canale e informazioni sul video.
 - **Pagina di Ricerca:** Funzionalità di ricerca per trovare video specifici.
 - **Sezione Commenti:** Riceve dalle API i 20 commenti più recenti. 
-- **Video Raccomandati:**Gestiti tramite dati statici, dato che le API relative non sono più disponibili o sono state limitate.
+- **Video Raccomandati:** Gestiti tramite dati statici, dato che le API relative non sono più disponibili o sono state limitate.
 
 ### Esperienza Utente e Dettagli Tecnici di Rilievo
 
