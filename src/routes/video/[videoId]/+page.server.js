@@ -8,14 +8,12 @@ const BASE_URL = 'https://www.googleapis.com/youtube/v3';
  * @param {typeof fetch} fetch
  */
 async function loadComments(videoId, fetch) {
-    // NOTA: Dovrai trovare l'endpoint corretto per i commenti nella documentazione dell'API di YouTube
-    // Di solito è 'commentThreads'
     const commentsRes = await fetch(`${BASE_URL}/commentThreads?part=snippet&videoId=${videoId}&key=${PUBLIC_YOUTUBE_API_KEY}`);
     if (!commentsRes.ok) {
         throw new Error("Impossibile caricare i commenti");
     }
     const commentsData = await commentsRes.json();
-    return commentsData.items; // Restituisce l'array di commenti
+    return commentsData.items;
 }
 
 export async function load({ fetch, params }) {
@@ -23,7 +21,6 @@ export async function load({ fetch, params }) {
         throw new Error("Api Key non è stata configurata");
     }
 
-    // Estraiamo l'ID del video DENTRO la funzione, da `params`
     const videoId = params.videoId;
 
     console.log(`Caricamento dati per il video con ID: ${videoId}`);
