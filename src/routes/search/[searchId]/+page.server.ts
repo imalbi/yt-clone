@@ -6,6 +6,7 @@ import { BASE_URL } from "$env/static/private";
 const cache = new Map();
 
 export async function load({fetch, params}) {
+    console.log(`Searching for ${params.searchId}`)
     if (cache.has(params.searchId)) {
         console.log(`✅ Risultato trovato in cache per: "${params.searchId}"`);
         return {searchResults:cache.get(params.searchId)} // Restituisce i dati salvati, non fa nessuna chiamata API!
@@ -25,7 +26,8 @@ export async function load({fetch, params}) {
         }
         const responseSearch = await dataVideoId.json(); 
         // Fix implicit 'any' type for 'item'
-        const videoIds = responseSearch.items.map((item: any) => item.id.videoId).join(',');   const videoDataRaw= await fetch(`${BASE_URL}/videos?part=snippet,statistics&id=${videoIds}&key=${PUBLIC_YOUTUBE_API_KEY}`) 
+        const videoIds = responseSearch.items.map((item: any) => item.id.videoId).join(',');   
+        const videoDataRaw= await fetch(`${BASE_URL}/videos?part=snippet,statistics&id=${videoIds}&key=${PUBLIC_YOUTUBE_API_KEY}`);
         if(!videoDataRaw.ok){
             const errorDetails = await videoDataRaw.json();
             throw new Error(`Errore API Video LIST :  ${errorDetails.error.message}`)
@@ -35,7 +37,9 @@ export async function load({fetch, params}) {
             id: string;
             snippet: {
                 title: string;
-                thumbnails: { maxres: { url: string } };
+                thumbnails: {
+                    [x: string]: any; maxres: { url: string } 
+};
                 publishedAt: string;
                 channelTitle: string;
                 channelId: string;
@@ -48,7 +52,7 @@ export async function load({fetch, params}) {
         }) => ({
             videoId: video.id,
             title: video.snippet.title,
-            thumbnail: video.snippet.thumbnails.maxres.url,
+            thumbnail: video.snippet.thumbnails.maxres?.url || video.snippet.thumbnails.medium.url,
             publishedAt: video.snippet.publishedAt,
             viewCount: video.statistics.viewCount,
             likeCount: video.statistics.likeCount,
