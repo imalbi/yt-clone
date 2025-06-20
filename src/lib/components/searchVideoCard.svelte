@@ -8,7 +8,7 @@
 <a href="/video/{video.videoId}" class="block"> <article class="flex flex-col sm:flex-row gap-4 rounded-lg p-2 bg-gray-100 hover:bg-gray-200 cursor-pointer">
         
         <div class="w-full sm:w-56 aspect-video flex-shrink-0"> 
-            <img class="w-full  object-cover rounded-md" src={video.thumbnail} alt="Thumbnail per {video.title}">
+            <img loading="lazy" class="w-full  object-cover rounded-md" src={video.thumbnail} alt="Thumbnail per {video.title}">
         </div>
         
         <div class="flex flex-col flex-1 min-w-0">

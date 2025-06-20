@@ -28,12 +28,12 @@
 </script>
 {#if data&&data.video&&data.channel}
     <div class="flex flex-col gap-2 w-full">
-        <iframe class="aspect-video rounded-2xl" id="ytplayer" title="Video" {src} frameborder="0"></iframe>
+        <iframe class="aspect-video rounded-2xl" id="ytplayer" title="Video" {src} frameborder="0" allowfullscreen></iframe>
 
         <h1 class= "font-bold text-xl">{data.video.title}{videoData.snippet.title}</h1>
         <div class="flex md:flex-row flex-col justify-between">
             <div class="flex flex-row gap-2 mt-2">
-                <img class="rounded-full contain-content size-14" src={data.channel.snippet.thumbnails.default.url} alt="Channel Avatar">
+                <img loading="lazy" class="rounded-full contain-content size-14" src={data.channel.snippet.thumbnails.default.url} alt="Channel Avatar">
                 <div class="flex flex-col ">
                     <h2 class="font-bold ">{data.channel.snippet.title}</h2>
                     <p class="font-light text-gray-600">{formatSubscriberCount(data.channel.statistics.subscriberCount)} di iscritti</p>

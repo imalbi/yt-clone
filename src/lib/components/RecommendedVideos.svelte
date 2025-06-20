@@ -10,8 +10,9 @@
         <div class="xl:w-48 xl:flex-shrink-0">
             <div class="aspect-video w-full">
                 <img 
+                    loading="lazy"
                     class="rounded-xl w-full h-full object-cover" 
-                    src={video.snippet.thumbnails.medium.url} 
+                    src={video.snippet.thumbnails.highres?.url||video.snippet.thumbnails.medium.url} 
                     alt="Thumbnail per {video.snippet.title}"
                 >
             </div>

@@ -7,7 +7,7 @@ import { formatSubscriberCount, formatTimeAgo } from "$lib/scripts/scripts";form
 <a href="/video/{video.id}" class="mb-2 mt-1">
     <article class="rounded-2xl p-2  hover:bg-gray-200 cursor-pointer">
         <div>
-            <img class="rounded-2xl w-full" src={video.snippet.thumbnails.maxres.url} alt="Thumbnail">
+            <img class="rounded-2xl w-full" src={video.snippet.thumbnails.maxres?.url||video.snippet.thumbnails.medium?.url} loading="lazy" alt="Thumbnail">
         </div>
         <div class="flex flex-row gap-2">
             <aside class=" flex-shrink-0"><img class="rounded-full size-12 mt-2 object-cover " src={video.channelAvatarUrl} alt="Avatar"></aside>
