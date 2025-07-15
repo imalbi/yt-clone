@@ -1,12 +1,10 @@
 <script lang="ts">
-	import burger from '$lib/assets/burger.svg';
 	import avatar from '$lib/assets/avatar.webp';
 	import search from '$lib/assets/search.svg';
 	import add from '$lib/assets/add.svg';
 	import bell from '$lib/assets/bell.svg';
 	import { goto } from '$app/navigation';
 	import { onMount } from 'svelte';
-	import { theme } from '$lib/stores/themeStore';
 	let { onToggle, inputSearch } = $props();
 	let user = {
 		img: avatar
@@ -63,19 +61,34 @@
 			</form>
 		</div>
 	{:else}
-		<div class="ml-1 flex flex-shrink-0 items-center md:whitespace-nowrap">
+		<div class="ml-1 flex flex-shrink-0 items-center gap-3 md:whitespace-nowrap">
 			<button
-				class="hover:bg-secondary flex h-10 w-10 cursor-pointer items-center justify-center rounded-full"
+				id="button"
+				class="style-scope yt-icon-button"
+				aria-label="Guida"
+				aria-pressed="false"
 				onclick={onToggle}
 			>
-				<img src={burger} alt="Menu" class="h-6 w-6" />
+				<div class="hover:bg-secondary ml-2 h-12 w-12 rounded-full p-2.5">
+					<svg
+						xmlns="http://www.w3.org/2000/svg"
+						height="24"
+						viewBox="0 0 24 24"
+						width="24"
+						focusable="false"
+						aria-hidden="true"
+						style="pointer-events: none; display: inherit; width: 100%; height: 100%; fill: currentColor;"
+					>
+						<path d="M21 6H3V5h18v1zm0 5H3v1h18v-1zm0 6H3v1h18v-1z"></path>
+					</svg>
+				</div>
 			</button>
 
 			<svg
 				xmlns="http://www.w3.org/2000/svg"
 				id="yt-ringo2-svg_yt10"
-				width="93"
-				height="20"
+				width="110"
+				height="25"
 				viewBox="0 0 93 20"
 				focusable="false"
 				aria-hidden="true"

@@ -4,6 +4,7 @@
 	formatSubscriberCount;
 </script>
 
+<!-- text-secondary -->
 <a href="/video/{video.id}" class="text-primary mt-1 mb-2">
 	<article class="hover:bg-secondary cursor-pointer rounded-2xl p-2">
 		<div>

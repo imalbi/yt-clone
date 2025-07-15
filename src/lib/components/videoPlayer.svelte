@@ -44,7 +44,7 @@
 				/>
 				<div class="flex flex-col">
 					<h2 class="font-bold">{data.channel.snippet.title}</h2>
-					<p class="font-light text-gray-600">
+					<p class="text-secondary font-light">
 						{formatSubscriberCount(data.channel.statistics.subscriberCount)} di iscritti
 					</p>
 				</div>
