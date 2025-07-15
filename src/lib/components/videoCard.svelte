@@ -9,25 +9,25 @@
 		<div>
 			<img
 				class="w-full rounded-2xl"
-				src={video.snippet.thumbnails.maxres?.url || video.snippet.thumbnails.medium?.url}
+				src={video.thumbnails.maxres ||
+					video.thumbnails.medium ||
+					video.thumbnails.standard ||
+					video.thumbnails.high ||
+					video.thumbnails.default}
 				loading="lazy"
-				alt="Thumbnail"
+				alt="{video.title} Thumbnail"
 			/>
 		</div>
 		<div class="flex flex-row gap-2">
 			<aside class=" flex-shrink-0">
-				<img
-					class="mt-2 size-12 rounded-full object-cover"
-					src={video.channelAvatarUrl}
-					alt="Avatar"
-				/>
+				<img class="mt-2 size-12 rounded-full object-cover" src={video.avatarUrl} alt="Avatar" />
 			</aside>
 			<div class="flex flex-col">
-				<h1 class="line-clamp-2 text-2xl font-semibold">{video.snippet.title}</h1>
-				<p class=" text-gray-600">{video.snippet.channelTitle}</p>
+				<h1 class="line-clamp-2 text-2xl font-semibold">{video.title}</h1>
+				<p class=" text-gray-600">{video.channelTitle}</p>
 				<p class="tracking-tight text-gray-600">
 					{formatSubscriberCount(video.statistics.viewCount)} visualizzazioni • {formatTimeAgo(
-						video.snippet.publishedAt
+						video.publishedAt
 					)}
 				</p>
 			</div>

@@ -1,9 +1,15 @@
 <script lang="ts">
+	import burger from '$lib/assets/burger.svg';
+	import avatar from '$lib/assets/avatar.webp';
+	import ytlogo from '$lib/assets/ytlogo.svg';
+	import search from '$lib/assets/search.svg';
+	import add from '$lib/assets/add.svg';
+	import bell from '$lib/assets/bell.svg';
 	import { goto } from '$app/navigation';
 	import { onMount } from 'svelte';
 	let { onToggle, inputSearch } = $props();
 	let user = {
-		img: '/media/avatar.webp'
+		img: avatar
 	};
 	let showOnlySearch = $state(false);
 	let isMobile = $state(false);
@@ -62,9 +68,9 @@
 				class="flex h-10 w-10 cursor-pointer items-center justify-center rounded-full hover:bg-gray-200"
 				onclick={onToggle}
 			>
-				<img src="/media/burger.svg" alt="Menu" class="h-6 w-6" />
+				<img src={burger} alt="Menu" class="h-6 w-6" />
 			</button>
-			<a href="/"><img class="h-8" src="/media/ytlogo.svg" alt="Home" /></a>
+			<a href="/"><img class="h-8" src={ytlogo} alt="Home" /></a>
 		</div>
 
 		<div class="order-2 flex flex-shrink-0 items-center">
@@ -79,18 +85,17 @@
 					type="submit"
 					class="bg-#F0F0F0 md:borderl-l-0 h-10 cursor-pointer rounded-full border border-gray-100 p-2
         hover:bg-gray-200 md:rounded-l-none md:rounded-r-full"
-					onclick={showSearch}
-					><img class="w-6 p-1" src="/media/search.svg" alt="Cerca Bottone" /></button
+					onclick={showSearch}><img class="w-6 p-1" src={search} alt="Cerca Bottone" /></button
 				>
 			</form>
 		</div>
 
 		<div class="order-3 mr-1 flex flex-shrink-0 items-center gap-1">
 			<button class="flex h-10 cursor-pointer items-center rounded-3xl hover:bg-gray-200"
-				><img class="h-9" src="/media/add.svg" alt="" />Crea</button
+				><img class="h-9" src={add} alt="" />Crea</button
 			>
 			<button class="h-10 w-10 cursor-pointer rounded-full hover:bg-gray-200"
-				><img class="p-2" src="/media/bell.svg" alt="" /></button
+				><img class="p-2" src={bell} alt="" /></button
 			>
 			<button class="h-10 w-10 cursor-pointer rounded-full"
 				><img class="rounded-full" src={user.img} alt="" /></button
