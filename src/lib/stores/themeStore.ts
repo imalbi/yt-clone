@@ -16,6 +16,8 @@ function createThemeStore() {
 	if (browser) {
 		const saved = localStorage.getItem(STORAGE_KEY) as Theme | null;
 		initialValue = saved || getSystemTheme();
+		// Apply initial theme to DOM
+		document.body.classList.toggle('dark-theme', initialValue === 'dark');
 	}
 
 	const { subscribe, set, update } = writable<Theme>(initialValue);
@@ -27,7 +29,6 @@ function createThemeStore() {
 			const saved = localStorage.getItem(STORAGE_KEY) as Theme | null;
 			if (!saved) {
 				set(e.matches ? 'dark' : 'light');
-				document.body.classList.toggle('dark-theme', e.matches);
 			}
 		};
 		media.addEventListener('change', systemThemeListener);
@@ -37,8 +38,8 @@ function createThemeStore() {
 		subscribe,
 		set: (theme: Theme) => {
 			if (browser) {
-				document.body.classList.toggle('dark-theme', theme === 'dark');
 				localStorage.setItem(STORAGE_KEY, theme);
+				document.body.classList.toggle('dark-theme', theme === 'dark');
 			}
 			set(theme);
 		},
@@ -46,8 +47,8 @@ function createThemeStore() {
 			update((currentTheme) => {
 				const newTheme = currentTheme === 'light' ? 'dark' : 'light';
 				if (browser) {
-					document.body.classList.toggle('dark-theme', newTheme === 'dark');
 					localStorage.setItem(STORAGE_KEY, newTheme);
+					document.body.classList.toggle('dark-theme', newTheme === 'dark');
 				}
 				return newTheme;
 			});

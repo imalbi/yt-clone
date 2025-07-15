@@ -5,8 +5,9 @@
 	import '../app.css';
 	import { page } from '$app/state';
 	import { onMount } from 'svelte';
-	import { theme } from '$lib/stores/themeStore'; // Import theme store
-	import '$lib/styles/theme.css'; // Ensure global styles are applied
+	import '$lib/styles/theme.css';
+	import { theme } from '$lib/stores/themeStore';
+
 	let isMenuOpen = $state(false);
 
 	let inputSearch = $state('');
@@ -18,12 +19,12 @@
 
 	let isMobile = $state(false);
 
-	$effect(() => {
-		// Apply the theme class to the body element
-		document.body.className = $theme;
-	});
-
 	onMount(() => {
+		theme.subscribe((value) => {
+			if (typeof document !== 'undefined') {
+				document.body.classList.toggle('dark-theme', value === 'dark');
+			}
+		});
 		if (typeof window !== 'undefined') {
 			isMobile = window.innerWidth < 768;
 			function updateIsMobile() {

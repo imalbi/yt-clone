@@ -4,8 +4,8 @@
 	formatSubscriberCount;
 </script>
 
-<a href="/video/{video.id}" class="mt-1 mb-2">
-	<article class="cursor-pointer rounded-2xl p-2 hover:bg-gray-200">
+<a href="/video/{video.id}" class="text-primary mt-1 mb-2">
+	<article class="hover:bg-secondary cursor-pointer rounded-2xl p-2">
 		<div>
 			<img
 				class="w-full rounded-2xl"
@@ -24,8 +24,8 @@
 			</aside>
 			<div class="flex flex-col">
 				<h1 class="line-clamp-2 text-2xl font-semibold">{video.title}</h1>
-				<p class=" text-gray-600">{video.channelTitle}</p>
-				<p class="tracking-tight text-gray-600">
+				<p class="text-secondary">{video.channelTitle}</p>
+				<p class="text-secondary tracking-tight">
 					{formatSubscriberCount(video.statistics.viewCount)} visualizzazioni • {formatTimeAgo(
 						video.publishedAt
 					)}
