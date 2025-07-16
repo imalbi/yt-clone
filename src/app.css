@@ -1,13 +1,28 @@
 @import 'tailwindcss';
 
-@plugin '@tailwindcss/forms';
-@plugin '@tailwindcss/typography';
-
-/* Classi personalizzate per i temi */
-.text-secondary {
-	color: var(--text-secondary);
+/* Definizione dei colori per tema chiaro e scuro */
+@theme {
+	--color-primary: var(--text-primary);
+	--color-secondary: var(--text-secondary);
+	--color-background: var(--background-primary);
+	--color-background-secondary: var(--background-secondary);
+	--color-border-color: var(--border);
 }
 
-.bg-secondary {
-	background-color: var(--bg-secondary);
+:root {
+	--text-primary: #0f0f0f;
+	--text-secondary: #606060;
+	--background-primary: #ffffff;
+	--background-secondary: #f9f9f9;
+	--border: #e0e0e0;
+}
+
+@media (prefers-color-scheme: dark) {
+	:root {
+		--text-primary: #f1f1f1;
+		--text-secondary: #b3b3b3;
+		--background-primary: #0f0f0f;
+		--background-secondary: #212121;
+		--border: #3d3d3d;
+	}
 }

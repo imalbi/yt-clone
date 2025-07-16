@@ -1,12 +1,10 @@
 <script lang="ts">
+	import '../app.css';
 	import TopBar from '$lib/components/topBar.svelte';
 	import SideBar from '$lib/components/sideBar.svelte';
 	import SideBarOverlay from '$lib/components/sideBarOverlay.svelte';
-	import '../app.css';
 	import { page } from '$app/state';
 	import { onMount } from 'svelte';
-	import '$lib/styles/theme.css';
-	import { theme } from '$lib/stores/themeStore';
 
 	let isMenuOpen = $state(false);
 
@@ -20,11 +18,6 @@
 	let isMobile = $state(false);
 
 	onMount(() => {
-		theme.subscribe((value) => {
-			if (typeof document !== 'undefined') {
-				document.body.classList.toggle('dark-theme', value === 'dark');
-			}
-		});
 		if (typeof window !== 'undefined') {
 			isMobile = window.innerWidth < 768;
 			function updateIsMobile() {
