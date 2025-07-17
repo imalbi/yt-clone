@@ -21,6 +21,15 @@ export interface Video {
 	avatarUrl: string;
 }
 
+export interface PlayerResponse {
+	//TODO: Implement mock player response;
+}
+
+//Needs Title, Description, ChannelTitle, Statistics, Comments, ChannelAvatarUrl.
+export const mockPlayerResponse: PlayerResponse = {
+	//TODO: Implement mock player response	};
+};
+
 export const mockApiResponse: Video[] = [
 	{
 		id: 'ya-1R6BEN30',

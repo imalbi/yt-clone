@@ -8,7 +8,6 @@
 	};
 	let showOnlySearch = $state(false);
 	let isMobile = $state(false);
-	//If not logged 3dots and login, no mic too
 
 	onMount(() => {
 		if (typeof window !== 'undefined') {
@@ -131,7 +130,7 @@
 			<form class="flex" {onsubmit}>
 				<input
 					bind:value={inputSearch}
-					class="border-border-color bg-background-secondary text-primary hidden h-10 w-[25vw] rounded-l-3xl border px-4 md:block"
+					class="border-border-color bg-background text-primary hidden h-10 w-[25vw] rounded-l-3xl border px-4 md:block"
 					type="text"
 					placeholder="Cerca"
 				/>
@@ -161,7 +160,7 @@
 		<div class="order-3 mr-1 flex flex-shrink-0 items-center gap-1">
 			<!--add new video button-->
 			<button
-				class="bg-background-secondary flex h-10 cursor-pointer items-center rounded-3xl p-2 font-semibold"
+				class="bg-background-secondary hover:bg-background-tertiary flex h-10 cursor-pointer items-center rounded-3xl p-2 pr-4 font-semibold"
 			>
 				<svg
 					class="h-6 w-6"
@@ -182,7 +181,7 @@
 
 			<!-- Notifiche -->
 			<button
-				class="bg-background-secondary flex h-10 w-10 cursor-pointer items-center justify-center rounded-full"
+				class="bg-background hover:bg-background-secondary hidden h-10 w-10 cursor-pointer items-center justify-center rounded-full md:flex"
 				aria-label="Notifiche"
 			>
 				<svg

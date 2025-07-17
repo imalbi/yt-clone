@@ -6,6 +6,7 @@
 	--color-secondary: var(--text-secondary);
 	--color-background: var(--background-primary);
 	--color-background-secondary: var(--background-secondary);
+	--color-background-tertiary: var(--background-hover);
 	--color-border-color: var(--border);
 }
 
@@ -13,8 +14,8 @@
 	--text-primary: #0f0f0f;
 	--text-secondary: #606060;
 	--background-primary: #ffffff;
-	--background-secondary: #f9f9f9;
-	--background-hover: #ececec;
+	--background-secondary: #ececec;
+	--background-hover: #d6d6d6;
 	--border: #e0e0e0;
 }
 

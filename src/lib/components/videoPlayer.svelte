@@ -1,7 +1,7 @@
 <script lang="ts">
 	import DescriptionBox from './DescriptionBox.svelte';
-
 	import { formatSubscriberCount } from '$lib/scripts/scripts';
+	// TODO: dark mode
 
 	let { data } = $props();
 	const src = $derived(`https://www.youtube.com/embed/${data.video.id}`);

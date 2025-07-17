@@ -36,9 +36,9 @@
 	{:else if isMobile}
 		<!-- No sidebar for search on mobile -->
 	{:else}
-		<aside class="w-30"><SideBar></SideBar></aside>
+		<aside><SideBar></SideBar></aside>
 	{/if}
 	{@render children()}
 </div>
-<aside></aside>
+
 <SideBarOverlay isOpen={isMenuOpen} close={handleToggleMenu}></SideBarOverlay>

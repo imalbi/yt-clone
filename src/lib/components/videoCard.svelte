@@ -4,7 +4,7 @@
 </script>
 
 <a href="/video/{video.id}" class="mt-1 mb-2">
-	<article class="cursor-pointer rounded-2xl p-2">
+	<article class=" cursor-pointer rounded-2xl p-2">
 		<div>
 			<img
 				class="w-full rounded-2xl"

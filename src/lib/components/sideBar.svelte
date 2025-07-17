@@ -3,7 +3,7 @@
 	import { page } from '$app/state';
 </script>
 
-<nav class="flex flex-col gap-3 pt-4" id="side-bar-main">
+<nav class="flex gap-3 pt-4">
 	<!--
 		Needs ul and li for better semantics and accessibility
 	-->

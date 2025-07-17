@@ -1,11 +1,13 @@
 <script lang="ts">
-	import { page } from '$app/state';
 	import VideoPlayer from '$lib/components/videoPlayer.svelte';
 	import CommentsCard from '$lib/components/CommentsCard.svelte';
 	import RecommendedVideos from '$lib/components/RecommendedVideos.svelte';
 	import { mockApiResponse } from '$lib/mocks/popularVideos.js';
 	import { fly } from 'svelte/transition';
-	let { data } = $props();
+	import { mockPlayerResponse } from '$lib/api/mock';
+	//let { data } = $props();
+	// Simulating data for the sake of this example
+	let data = { youtubeApi: mockPlayerResponse, comments: [], video: mockApiResponse[0] };
 </script>
 
 <div class="w-full p-4 xl:p-8">
