@@ -4,17 +4,17 @@
 	import RecommendedVideos from '$lib/components/RecommendedVideos.svelte';
 	import { mockApiResponse } from '$lib/mocks/popularVideos.js';
 	import { fly } from 'svelte/transition';
-	import { mockPlayerResponse } from '$lib/api/mock';
 	//let { data } = $props();
 	// Simulating data for the sake of this example
-	let data = { youtubeApi: mockPlayerResponse, comments: [], video: mockApiResponse[0] };
+	let { data } = $props();
 </script>
 
 <div class="w-full p-4 xl:p-8">
 	<div class="flex flex-col gap-8 xl:flex-row">
 		<div class="w-full">
-			<VideoPlayer {data} />
-			<CommentsCard {data}></CommentsCard>
+			<VideoPlayer video={data.video} />
+
+			<CommentsCard comments={data.comments} video={data.video}></CommentsCard>
 		</div>
 
 		<div
