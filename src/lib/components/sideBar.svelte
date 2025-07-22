@@ -1,23 +1,33 @@
 <script lang="ts">
-import { items } from "$lib/menuItems";
-
+	import { items } from '$lib/utils/menuItems';
+	import { page } from '$app/state';
 </script>
 
+<nav class="flex gap-3 pt-4">
+	<!--
+		Needs ul and li for better semantics and accessibility
+	-->
+	<ul>
+		{#each items as item (item.ref)}
+			<li>
+				<a
+					href={item.ref}
+					data-sveltekit-prefetch="off"
+					class="hover:bg-background-secondary bg-background flex h-20 w-20 cursor-pointer flex-col items-center justify-center gap-1 rounded-xl"
+				>
+					<span class="text-primary h-6 w-6">
+						{#if item.ref === page.url.pathname}
+							{@html item.activesvg}
+						{:else}
+							{@html item.svg}
+						{/if}
+					</span>
 
-<nav class="flex flex-col gap-3 pt-4 " id="side-bar-main">
-    {#each items as item}
-        <a 
-            href={item.ref} 
-            data-sveltekit-prefetch="off"
-            class="flex flex-col items-center justify-center h-20 w-20 gap-1 rounded-xl  hover:bg-gray-200 cursor-pointer"
-        >
-            <span class="w-6 h-6">
-                {@html item.svg}
-            </span>
-
-            <span class="text-xs text-center">
-                {item.description}
-            </span>
-        </a>
-    {/each}
+					<span class="text-primary text-center text-xs">
+						{item.description}
+					</span>
+				</a>
+			</li>
+		{/each}
+	</ul>
 </nav>
