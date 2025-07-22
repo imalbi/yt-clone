@@ -149,8 +149,9 @@ export async function getChannelById(channelId: string): Promise<Channel | null>
 	}
 }
 
-//TODO: getCommentsByVideoId
 /**
+ * Get comments for a specific video.
+ * This function retrieves comments for a given video ID, including top-level comments and their replies.
  * @param videoId - L'ID del video per cui recuperare i commenti.
  * @param pageToken - Token di pagina opzionale per la paginazione dei risultati.
  * @returns Una lista di commenti per il video specificato.
@@ -204,8 +205,52 @@ export async function getComments(videoId: string, pageToken?: string): Promise<
 	}
 }
 
-//TODO: getRelatedVideosByVideoId
+//TODO: ? getRelatedVideosByVideoId
 
-//TODO: searchVideosByQuery
+export async function searchVideos(query: string): Promise<Video[]> {
+	if (!query) {
+		throw new Error('Query is required');
+	}
+	if (!PUBLIC_YOUTUBE_API_KEY) {
+		throw new Error('YouTube API key is not defined');
+	}
+	try {
+		const response = await fetch(
+			`${BASE_URL}/search?part=snippet&q=${query}&type=video&maxResults=20&key=${PUBLIC_YOUTUBE_API_KEY}`
+		);
+		if (!response.ok) {
+			throw new Error('Failed to fetch videos');
+		}
+		const data = await response.json();
+
+		data.items = await Promise.all(
+			data.items.map(async (item: any) => {
+				const video = await getVideoById(item.id.videoId);
+				return {
+					...video,
+					id: item.id.videoId,
+					title: item.snippet.title,
+					desc: item.snippet.description,
+					thumbnails: {
+						default: item.snippet.thumbnails.default ? item.snippet.thumbnails.default.url : '',
+						medium: item.snippet.thumbnails.medium ? item.snippet.thumbnails.medium.url : '',
+						high: item.snippet.thumbnails.high ? item.snippet.thumbnails.high.url : '',
+						standard: item.snippet.thumbnails.standard
+							? item.snippet.thumbnails.standard.url
+							: undefined,
+						maxres: item.snippet.thumbnails.maxres ? item.snippet.thumbnails.maxres.url : undefined
+					},
+					publishedAt: item.snippet.publishedAt,
+					channelId: item.snippet.channelId,
+					channelTitle: item.snippet.channelTitle
+				};
+			})
+		);
+		return data.items;
+	} catch (error) {
+		console.error(error);
+		throw error;
+	}
+}
 
 //TODO: getVideos to use actual YouTube API
