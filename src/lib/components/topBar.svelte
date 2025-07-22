@@ -23,17 +23,26 @@
 	function showSearch() {
 		if (isMobile) {
 			showOnlySearch = true;
-		} else {
-			console.log('Not on mobile');
+		}
+	}
+
+	let timeout: number;
+	function debounceSearch() {
+		clearTimeout(timeout);
+		timeout = setTimeout(() => {
+			doSearch();
+		}, 500);
+	}
+
+	function doSearch() {
+		if (inputSearch) {
+			goto(`/search/${inputSearch}`);
 		}
 	}
 
 	function onsubmit(event: SubmitEvent) {
 		event.preventDefault();
-		if (inputSearch) {
-			console.log({ inputSearch });
-			goto(`/search/${inputSearch}`);
-		}
+		doSearch();
 	}
 </script>
 
@@ -52,6 +61,7 @@
 				<input
 					type="text"
 					bind:value={inputSearch}
+					oninput={debounceSearch}
 					class="border-border-color bg-background-secondary text-primary h-10 w-full rounded-r-full border px-4"
 					placeholder="Cerca"
 				/>
@@ -130,6 +140,7 @@
 			<form class="flex" {onsubmit}>
 				<input
 					bind:value={inputSearch}
+					oninput={debounceSearch}
 					class="border-border-color bg-background text-primary hidden h-10 w-[25vw] rounded-l-3xl border px-4 md:block"
 					type="text"
 					placeholder="Cerca"

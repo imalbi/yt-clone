@@ -6,53 +6,82 @@ import type { CommentThread } from '$lib/types/commentThread';
 const BASE_URL = 'https://www.googleapis.com/youtube/v3';
 
 /**
- * @returns Una lista di video popolari dalla api pubblica di YouTube.
+ * @returns A list of popular videos from the public YouTube API.
  */
-export async function getVideos(): Promise<Video[]> {
-	// Qui andrà la vera chiamata API per ottenere i video
+export async function getVideos(maxResults: number = 20): Promise<Video[]> {
 	if (!PUBLIC_YOUTUBE_API_KEY) {
 		throw new Error('YouTube API key is not defined');
 	}
 	try {
 		const response = await fetch(
-			`${BASE_URL}/videos?part=snippet,statistics,contentDetails&chart=mostPopular&regionCode=IT&maxResults=20&key=${PUBLIC_YOUTUBE_API_KEY}`
+			`${BASE_URL}/videos?part=snippet,statistics,contentDetails&chart=mostPopular&regionCode=IT&maxResults=${maxResults}&key=${PUBLIC_YOUTUBE_API_KEY}`
 		);
 		if (!response.ok) {
 			throw new Error('Failed to fetch videos');
 		}
 		const data = await response.json();
 
-		//I have to modify the data structure to match the mockApi.Video type
-		data.items = await Promise.all(
-			data.items.map(async (item: any) => {
-				const channel = await getChannelById(item.snippet.channelId);
-				return {
-					id: item.id,
-					title: item.snippet.title,
-					desc: item.snippet.description,
-					thumbnails: {
-						default: item.snippet.thumbnails.default ? item.snippet.thumbnails.default.url : '',
-						medium: item.snippet.thumbnails.medium ? item.snippet.thumbnails.medium.url : '',
-						high: item.snippet.thumbnails.high ? item.snippet.thumbnails.high.url : '',
-						standard: item.snippet.thumbnails.standard
-							? item.snippet.thumbnails.standard.url
-							: undefined,
-						maxres: item.snippet.thumbnails.maxres ? item.snippet.thumbnails.maxres.url : undefined
-					},
-					publishedAt: item.snippet.publishedAt,
-					channelId: item.snippet.channelId,
-					channelTitle: item.snippet.channelTitle,
-					avatarUrl: channel?.thumbnails.default.url,
-					statistics: {
-						viewCount: item.statistics.viewCount || '0',
-						likeCount: item.statistics.likeCount || '0',
-						commentCount: item.statistics.commentCount || '0',
-						favoriteCount: item.statistics.favoriteCount || '0'
-					}
-				};
-			})
+		const channelIds = data.items.map((item: any) => item.snippet.channelId).join(',');
+		const channels = await getChannelsByIds(channelIds);
+
+		const videos = data.items.map((item: any) => {
+			const channel = channels.find((c) => c.id === item.snippet.channelId);
+			return {
+				id: item.id,
+				title: item.snippet.title,
+				desc: item.snippet.description,
+				thumbnails: {
+					default: item.snippet.thumbnails.default?.url || '',
+					medium: item.snippet.thumbnails.medium?.url || '',
+					high: item.snippet.thumbnails.high?.url || '',
+					standard: item.snippet.thumbnails.standard?.url,
+					maxres: item.snippet.thumbnails.maxres?.url
+				},
+				publishedAt: item.snippet.publishedAt,
+				channelId: item.snippet.channelId,
+				channelTitle: item.snippet.channelTitle,
+				avatarUrl: channel?.thumbnails.default.url,
+				statistics: {
+					viewCount: item.statistics?.viewCount || '0',
+					likeCount: item.statistics?.likeCount || '0',
+					commentCount: item.statistics?.commentCount || '0',
+					favoriteCount: item.statistics?.favoriteCount || '0'
+				}
+			};
+		});
+
+		return videos;
+	} catch (error) {
+		console.error(error);
+		throw error;
+	}
+}
+
+/**
+ * @param channelIds - A comma-separated string of channel IDs.
+ * @returns A list of channels.
+ */
+async function getChannelsByIds(channelIds: string): Promise<Channel[]> {
+	if (!PUBLIC_YOUTUBE_API_KEY) {
+		throw new Error('YouTube API key is not defined');
+	}
+	try {
+		const response = await fetch(
+			`${BASE_URL}/channels?part=snippet,statistics&id=${channelIds}&key=${PUBLIC_YOUTUBE_API_KEY}`
 		);
-		return data.items;
+		if (!response.ok) {
+			throw new Error('Failed to fetch channels');
+		}
+		const data = await response.json();
+		return data.items.map((item: any) => ({
+			id: item.id,
+			title: item.snippet.title,
+			description: item.snippet.description,
+			customUrl: item.snippet.customUrl,
+			publishedAt: item.snippet.publishedAt,
+			thumbnails: item.snippet.thumbnails,
+			statistics: item.statistics
+		}));
 	} catch (error) {
 		console.error(error);
 		throw error;
@@ -67,7 +96,6 @@ export async function getVideoById(videoId: string): Promise<Video | null> {
 	if (!videoId) {
 		throw new Error('Video ID is required');
 	}
-	//Chiamata API per ottenere il video
 	if (!PUBLIC_YOUTUBE_API_KEY) {
 		throw new Error('YouTube API key is not defined');
 	}
@@ -79,70 +107,39 @@ export async function getVideoById(videoId: string): Promise<Video | null> {
 			throw new Error('Failed to fetch video');
 		}
 		const data = await response.json();
-
-		//I have to modify the data structure to match the mockApi.Video type
-		data.items = await Promise.all(
-			data.items.map(async (item: any) => {
-				const channel = await getChannelById(item.snippet.channelId);
-				return {
-					id: item.id,
-					title: item.snippet.title,
-					desc: item.snippet.description,
-					thumbnails: {
-						default: item.snippet.thumbnails.default ? item.snippet.thumbnails.default.url : '',
-						medium: item.snippet.thumbnails.medium ? item.snippet.thumbnails.medium.url : '',
-						high: item.snippet.thumbnails.high ? item.snippet.thumbnails.high.url : '',
-						standard: item.snippet.thumbnails.standard
-							? item.snippet.thumbnails.standard.url
-							: undefined,
-						maxres: item.snippet.thumbnails.maxres ? item.snippet.thumbnails.maxres.url : undefined
-					},
-					publishedAt: item.snippet.publishedAt,
-					channelId: item.snippet.channelId,
-					channelTitle: item.snippet.channelTitle,
-					avatarUrl: channel?.thumbnails.default.url,
-					statistics: {
-						viewCount: item.statistics.viewCount || '0',
-						likeCount: item.statistics.likeCount || '0',
-						commentCount: item.statistics.commentCount || '0',
-						favoriteCount: item.statistics.favoriteCount || '0'
-					}
-				};
-			})
-		);
-
-		return data.items[0] || null;
-	} catch (error) {
-		console.error(error);
-		throw error;
-	}
-}
-
-export async function getChannelById(channelId: string): Promise<Channel | null> {
-	if (!PUBLIC_YOUTUBE_API_KEY) {
-		throw new Error('YouTube API key is not defined');
-	}
-	try {
-		const response = await fetch(
-			`${BASE_URL}/channels?part=snippet,statistics&id=${channelId}&key=${PUBLIC_YOUTUBE_API_KEY}`
-		);
-		if (!response.ok) {
-			throw new Error('Failed to fetch channel');
-		}
-		const data = await response.json();
 		if (data.items.length === 0) {
 			return null;
 		}
-		const item = data.items[0];
-		return {
-			id: item.id,
-			title: item.snippet.title,
-			description: item.snippet.description,
-			customUrl: item.snippet.customUrl,
-			publishedAt: item.snippet.publishedAt,
-			thumbnails: item.snippet.thumbnails,
-			statistics: item.statistics
+
+		const videoItem = data.items[0];
+		const channelId = videoItem.snippet.channelId;
+		const channels = await getChannelsByIds(channelId);
+		const channel = channels[0];
+
+		const video = {
+			id: videoItem.id,
+			title: videoItem.snippet.title,
+			desc: videoItem.snippet.description,
+			thumbnails: {
+				default: videoItem.snippet.thumbnails.default?.url || '',
+				medium: videoItem.snippet.thumbnails.medium?.url || '',
+				high: videoItem.snippet.thumbnails.high?.url || '',
+				standard: videoItem.snippet.thumbnails.standard?.url,
+				maxres: videoItem.snippet.thumbnails.maxres?.url
+			},
+			publishedAt: videoItem.snippet.publishedAt,
+			channelId: videoItem.snippet.channelId,
+			channelTitle: videoItem.snippet.channelTitle,
+			avatarUrl: channel?.thumbnails.default.url,
+			statistics: {
+				viewCount: videoItem.statistics?.viewCount || '0',
+				likeCount: videoItem.statistics?.likeCount || '0',
+				commentCount: videoItem.statistics?.commentCount || '0',
+				favoriteCount: videoItem.statistics?.favoriteCount || '0'
+			}
 		};
+
+		return video;
 	} catch (error) {
 		console.error(error);
 		throw error;
@@ -205,8 +202,6 @@ export async function getComments(videoId: string, pageToken?: string): Promise<
 	}
 }
 
-//TODO: ? getRelatedVideosByVideoId
-
 export async function searchVideos(query: string): Promise<Video[]> {
 	if (!query) {
 		throw new Error('Query is required');
@@ -223,34 +218,47 @@ export async function searchVideos(query: string): Promise<Video[]> {
 		}
 		const data = await response.json();
 
-		data.items = await Promise.all(
-			data.items.map(async (item: any) => {
-				const video = await getVideoById(item.id.videoId);
-				return {
-					...video,
-					id: item.id.videoId,
-					title: item.snippet.title,
-					desc: item.snippet.description,
-					thumbnails: {
-						default: item.snippet.thumbnails.default ? item.snippet.thumbnails.default.url : '',
-						medium: item.snippet.thumbnails.medium ? item.snippet.thumbnails.medium.url : '',
-						high: item.snippet.thumbnails.high ? item.snippet.thumbnails.high.url : '',
-						standard: item.snippet.thumbnails.standard
-							? item.snippet.thumbnails.standard.url
-							: undefined,
-						maxres: item.snippet.thumbnails.maxres ? item.snippet.thumbnails.maxres.url : undefined
-					},
-					publishedAt: item.snippet.publishedAt,
-					channelId: item.snippet.channelId,
-					channelTitle: item.snippet.channelTitle
-				};
-			})
+		const videoIds = data.items.map((item: any) => item.id.videoId).join(',');
+		const videosResponse = await fetch(
+			`${BASE_URL}/videos?part=snippet,statistics,contentDetails&id=${videoIds}&key=${PUBLIC_YOUTUBE_API_KEY}`
 		);
-		return data.items;
+		if (!videosResponse.ok) {
+			throw new Error('Failed to fetch video details');
+		}
+		const videosData = await videosResponse.json();
+
+		const channelIds = videosData.items.map((item: any) => item.snippet.channelId).join(',');
+		const channels = await getChannelsByIds(channelIds);
+
+		const videos = videosData.items.map((item: any) => {
+			const channel = channels.find((c) => c.id === item.snippet.channelId);
+			return {
+				id: item.id,
+				title: item.snippet.title,
+				desc: item.snippet.description,
+				thumbnails: {
+					default: item.snippet.thumbnails.default?.url || '',
+					medium: item.snippet.thumbnails.medium?.url || '',
+					high: item.snippet.thumbnails.high?.url || '',
+					standard: item.snippet.thumbnails.standard?.url,
+					maxres: item.snippet.thumbnails.maxres?.url
+				},
+				publishedAt: item.snippet.publishedAt,
+				channelId: item.snippet.channelId,
+				channelTitle: item.snippet.channelTitle,
+				avatarUrl: channel?.thumbnails.default.url,
+				statistics: {
+					viewCount: item.statistics?.viewCount || '0',
+					likeCount: item.statistics?.likeCount || '0',
+					commentCount: item.statistics?.commentCount || '0',
+					favoriteCount: item.statistics?.favoriteCount || '0'
+				}
+			};
+		});
+
+		return videos;
 	} catch (error) {
 		console.error(error);
 		throw error;
 	}
 }
-
-//TODO: getVideos to use actual YouTube API

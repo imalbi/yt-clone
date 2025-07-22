@@ -1,7 +1,5 @@
 <script lang="ts">
 	import SearchVideoCard from '$lib/components/searchVideoCard.svelte';
-	import type { Video } from '$lib/api/mock';
-
 	let { data } = $props();
 	import { page } from '$app/state';
 </script>

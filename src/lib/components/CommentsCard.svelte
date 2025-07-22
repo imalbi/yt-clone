@@ -1,13 +1,14 @@
 <script lang="ts">
 	import CommentCard from './commentCard.svelte';
 	import type { CommentThread } from '$lib/types/commentThread';
+	import CommentReply from '$lib/components/CommentReply.svelte';
 	import type { Video } from '$lib/api/mock';
 
 	let {
 		comments,
 		video
 	}: {
-		comments: Promise<CommentThread[]>;
+		comments: CommentThread[];
 		video: Promise<Video | null>;
 	} = $props();
 	//video is used to get the comment count
@@ -79,7 +80,7 @@
 			{/if}
 			<!--TODO: Replies Should have a different style-->
 			{#each comment.replies as reply (reply.id)}
-				<CommentCard commentData={reply}></CommentCard>
+				<CommentReply commentData={reply}></CommentReply>
 			{/each}
 		{/each}
 		<button
