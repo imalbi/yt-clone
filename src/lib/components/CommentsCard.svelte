@@ -1,6 +1,6 @@
 <script lang="ts">
 	import CommentCard from './commentCard.svelte';
-	import type { Comment, CommentThread } from '$lib/types/commentThread';
+	import type { CommentThread } from '$lib/types/commentThread';
 	import type { Video } from '$lib/api/mock';
 
 	let {

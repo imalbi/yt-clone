@@ -2,12 +2,12 @@
 	import { formatTimeAgo } from '$lib/scripts/scripts';
 
 	let { commentData } = $props();
-	let defaultAvatar = '/media/avatar.webp';
 
 	function handleImageError(e: Event) {
 		if (e.target instanceof HTMLImageElement) {
 			e.target.onerror = null;
-			e.target.src = defaultAvatar;
+			const firstLetter = commentData.authorDisplayName?.charAt(1).toUpperCase() || 'A';
+			e.target.src = `https://ui-avatars.com/api/?name=${firstLetter}&background=random&color=fff`;
 		}
 	}
 </script>
