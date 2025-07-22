@@ -102,11 +102,11 @@ Un clone funzionale e moderno dell'interfaccia di YouTube, costruito con SvelteK
 
 ## 🚀 Possibili Miglioramenti Futuri
 
-- [50%] Refactor dei Load 
+- [x] Refactor dei Load 
 - [ ] Refactor dei Componenti per separare in pezzi ancora più piccoli.
 - [66%] Implementare Skeleton Screens
 - [ ] Implementare un sistema di paginazione o "infinite scroll" per i commenti e i risultati di ricerca.
-- [66%] Implementare Dark Mode
+- [x] Implementare Dark Mode
 
 ---
 
