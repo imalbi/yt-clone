@@ -8,14 +8,19 @@ const BASE_URL = 'https://www.googleapis.com/youtube/v3';
 /**
  * @returns A list of popular videos from the public YouTube API.
  */
-export async function getVideos(maxResults: number = 20): Promise<Video[]> {
+export async function getVideos(
+	maxResults: number = 20,
+	pageToken?: string
+): Promise<{ videos: Video[]; nextPageToken?: string; prevPageToken?: string }> {
 	if (!PUBLIC_YOUTUBE_API_KEY) {
 		throw new Error('YouTube API key is not defined');
 	}
 	try {
-		const response = await fetch(
-			`${BASE_URL}/videos?part=snippet,statistics,contentDetails&chart=mostPopular&regionCode=IT&maxResults=${maxResults}&key=${PUBLIC_YOUTUBE_API_KEY}`
-		);
+		let url = `${BASE_URL}/videos?part=snippet,statistics,contentDetails&chart=mostPopular&regionCode=IT&maxResults=${maxResults}&key=${PUBLIC_YOUTUBE_API_KEY}`;
+		if (pageToken) {
+			url += `&pageToken=${pageToken}`;
+		}
+		const response = await fetch(url);
 		if (!response.ok) {
 			throw new Error('Failed to fetch videos');
 		}
@@ -50,7 +55,11 @@ export async function getVideos(maxResults: number = 20): Promise<Video[]> {
 			};
 		});
 
-		return videos;
+		return {
+			videos: videos,
+			nextPageToken: data.nextPageToken,
+			prevPageToken: data.prevPageToken
+		};
 	} catch (error) {
 		console.error(error);
 		throw error;
