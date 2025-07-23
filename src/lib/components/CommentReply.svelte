@@ -10,6 +10,20 @@
 			e.target.src = `https://ui-avatars.com/api/?name=${firstLetter}&background=random&color=fff`;
 		}
 	}
+
+	// Funzione per decodificare entità HTML e sanitizzare il contenuto
+	function decodeAndSanitizeHtml(text: string): string {
+		// Decodifica entità HTML
+		const textarea = document.createElement('textarea');
+		textarea.innerHTML = text;
+		const decoded = textarea.value;
+
+		// Permetti solo alcuni tag sicuri e attributi specifici
+		return decoded
+			.replace(/<script[^>]*>[\s\S]*?<\/script>/gi, '') // Rimuovi script
+			.replace(/javascript:/gi, '') // Rimuovi javascript:
+			.replace(/on\w+\s*=/gi, ''); // Rimuovi event handlers
+	}
 </script>
 
 <!-- Risposta al commento con margine sinistro per indicare che è una risposta -->
@@ -26,9 +40,9 @@
 			<span class="text-secondary ml-2">{formatTimeAgo(commentData.publishedAt)}</span>
 		</p>
 
-		<p class="text-primary mt-1 text-sm break-words whitespace-pre-line">
-			{commentData.textDisplay}
-		</p>
+		<div class="text-primary comment-content mt-1 text-sm break-words whitespace-pre-line">
+			{@html decodeAndSanitizeHtml(commentData.textDisplay)}
+		</div>
 
 		<div class="mt-2 flex items-center gap-1">
 			<button

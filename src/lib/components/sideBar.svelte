@@ -3,7 +3,7 @@
 	import { page } from '$app/state';
 </script>
 
-<nav class="flex gap-3 pt-4">
+<nav class="bg-background fixed top-16 left-0 z-40 flex h-screen gap-3 pt-4">
 	<!--
 		Needs ul and li for better semantics and accessibility
 	-->

@@ -30,15 +30,18 @@
 </script>
 
 <TopBar onToggle={handleToggleMenu} {inputSearch} />
-<div class="flex flex-row">
+<div class="flex flex-row pt-16">
 	{#if page.url.pathname.startsWith('/video/')}
 		<!-- No sidebar for video pages -->
+		{@render children()}
 	{:else if isMobile}
 		<!-- No sidebar for search on mobile -->
+		{@render children()}
 	{:else}
-		<aside><SideBar></SideBar></aside>
+		<!-- Sidebar placeholder + fixed sidebar -->
+		<aside class="w-20 flex-shrink-0"><SideBar></SideBar></aside>
+		<main class="flex-1">{@render children()}</main>
 	{/if}
-	{@render children()}
 </div>
 
 <SideBarOverlay isOpen={isMenuOpen} close={handleToggleMenu}></SideBarOverlay>
