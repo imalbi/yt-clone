@@ -11,7 +11,8 @@ export async function load({ params }) {
 		return {
 			video: videoPromise,
 			comments: commentsPromise,
-			relatedVideos: relatedVideosPromise,
+			relatedVideos: relatedVideosPromise.then((data) => data.videos),
+			nextPageToken: relatedVideosPromise.then((data) => data.nextPageToken),
 			error: null
 		};
 	} catch (error) {
@@ -19,6 +20,7 @@ export async function load({ params }) {
 			video: Promise.resolve(null),
 			comments: Promise.resolve([]),
 			relatedVideos: Promise.resolve([]),
+			nextPageToken: Promise.resolve(undefined),
 			error: error instanceof Error ? error.message : 'Errore sconosciuto'
 		};
 	}
