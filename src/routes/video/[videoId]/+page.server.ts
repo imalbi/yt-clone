@@ -10,7 +10,8 @@ export async function load({ params }) {
 
 		return {
 			video: videoPromise,
-			comments: commentsPromise,
+			comments: commentsPromise.then((data) => data.comments),
+			commentsNextPageToken: commentsPromise.then((data) => data.nextPageToken),
 			relatedVideos: relatedVideosPromise.then((data) => data.videos),
 			nextPageToken: relatedVideosPromise.then((data) => data.nextPageToken),
 			error: null
@@ -19,6 +20,7 @@ export async function load({ params }) {
 		return {
 			video: Promise.resolve(null),
 			comments: Promise.resolve([]),
+			commentsNextPageToken: Promise.resolve(undefined),
 			relatedVideos: Promise.resolve([]),
 			nextPageToken: Promise.resolve(undefined),
 			error: error instanceof Error ? error.message : 'Errore sconosciuto'

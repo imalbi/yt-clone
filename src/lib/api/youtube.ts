@@ -162,7 +162,10 @@ export async function getVideoById(videoId: string): Promise<Video | null> {
  * @param pageToken - Token di pagina opzionale per la paginazione dei risultati.
  * @returns Una lista di commenti per il video specificato.
  */
-export async function getComments(videoId: string, pageToken?: string): Promise<CommentThread[]> {
+export async function getComments(
+	videoId: string,
+	pageToken?: string
+): Promise<{ comments: CommentThread[]; nextPageToken?: string }> {
 	if (!videoId) {
 		throw new Error('Video ID is required');
 	}
@@ -204,14 +207,20 @@ export async function getComments(videoId: string, pageToken?: string): Promise<
 					}))
 				: []
 		}));
-		return comments;
+		return {
+			comments: comments,
+			nextPageToken: data.nextPageToken
+		};
 	} catch (error) {
 		console.error(error);
 		throw error;
 	}
 }
 
-export async function searchVideos(query: string): Promise<Video[]> {
+export async function searchVideos(
+	query: string,
+	pageToken?: string
+): Promise<{ videos: Video[]; nextPageToken?: string }> {
 	if (!query) {
 		throw new Error('Query is required');
 	}
@@ -219,9 +228,11 @@ export async function searchVideos(query: string): Promise<Video[]> {
 		throw new Error('YouTube API key is not defined');
 	}
 	try {
-		const response = await fetch(
-			`${BASE_URL}/search?part=snippet&q=${query}&type=video&maxResults=20&key=${PUBLIC_YOUTUBE_API_KEY}`
-		);
+		let url = `${BASE_URL}/search?part=snippet&q=${query}&type=video&maxResults=20&key=${PUBLIC_YOUTUBE_API_KEY}`;
+		if (pageToken) {
+			url += `&pageToken=${pageToken}`;
+		}
+		const response = await fetch(url);
 		if (!response.ok) {
 			throw new Error('Failed to fetch videos');
 		}
@@ -265,7 +276,10 @@ export async function searchVideos(query: string): Promise<Video[]> {
 			};
 		});
 
-		return videos;
+		return {
+			videos: videos,
+			nextPageToken: data.nextPageToken
+		};
 	} catch (error) {
 		console.error(error);
 		throw error;

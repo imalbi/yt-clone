@@ -46,7 +46,9 @@
 	}
 </script>
 
-<nav class="bg-background text-primary mt-2 flex w-full items-center justify-between">
+<nav
+	class="bg-background text-primary fixed top-0 z-50 flex w-full items-center justify-between p-3 shadow-md"
+>
 	<!-- Mobile search button -->
 	{#if showOnlySearch}
 		<div class="flex w-full items-center">
@@ -70,10 +72,10 @@
 	{:else}
 		<!-- End of mobile search button -->
 		<!-- Container for menu button, youtube logo(refers homepage) -->
-		<div class="ml-1 flex flex-shrink-0 items-center gap-3 md:whitespace-nowrap">
+		<div class="flex flex-shrink-0 items-center justify-between gap-3 md:whitespace-nowrap">
 			<!-- Menu button -->
 			<button id="button" aria-label="Menu" onclick={onToggle} class="cursor-pointer">
-				<div class="hover:bg-background-secondary ml-2 h-12 w-12 rounded-full p-2.5">
+				<div class="hover:bg-background-secondary h-12 w-12 rounded-full p-2.5">
 					<svg
 						xmlns="http://www.w3.org/2000/svg"
 						height="24"

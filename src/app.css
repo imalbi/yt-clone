@@ -29,3 +29,20 @@
 		--border: #3d3d3d;
 	}
 }
+
+/* Stili per i link nei commenti */
+.comment-content a {
+	color: #3ea6ff;
+	text-decoration: none;
+	font-weight: 500;
+}
+
+.comment-content a:hover {
+	text-decoration: underline;
+}
+
+@media (prefers-color-scheme: dark) {
+	.comment-content a {
+		color: #3ea6ff;
+	}
+}

@@ -25,23 +25,31 @@
 		nextPageToken = newVideosData.nextPageToken;
 	}
 
-	// Initialize data when promises resolve
+	// Initialize data when promises resolve or when video changes
 	$effect(() => {
+		// Reset state when video changes
+		isLoaded = false;
+		videos = [];
+		nextPageToken = undefined;
+		error = null;
+
 		data.relatedVideos
 			.then((awaitedVideos) => {
-				if (!isLoaded) {
-					videos = awaitedVideos;
-					isLoaded = true;
-				}
+				videos = awaitedVideos;
+				isLoaded = true;
 			})
 			.catch((err) => {
 				error = err?.message || err;
 				isLoaded = true;
 			});
 
-		data.nextPageToken.then((token) => {
-			nextPageToken = token;
-		});
+		data.nextPageToken
+			.then((token) => {
+				nextPageToken = token;
+			})
+			.catch(() => {
+				// Handle token error silently
+			});
 	});
 
 	const refactor = $state(false);
@@ -82,7 +90,7 @@
 					<div
 						class="hidden xl:block"
 						use:inview={{ threshold: 0.1 }}
-						oninview_enter={() => loadMoreVideos()}
+						oninview_enter={loadMoreVideos}
 					>
 						<SkeletonRecommended />
 					</div>
@@ -92,18 +100,18 @@
 		<div class="xl:hidden">
 			<button
 				class="bg-background-secondary hover:bg-background-tertiary/90 text-primary w-full cursor-pointer rounded-lg px-4 py-3 font-bold transition-colors"
-				onclick={() => loadMoreVideos()}
+				onclick={loadMoreVideos}
 			>
 				Carica altri video
 			</button>
 		</div>
 
 		<div class="w-full xl:col-start-1 xl:row-start-2">
-			{#await data.comments}
-				<p>Loading comments...</p>
-			{:then comments}
-				<CommentsCard {comments} video={data.video}></CommentsCard>
-			{/await}
+			<CommentsCard
+				comments={data.comments}
+				video={data.video}
+				commentsNextPageToken={data.commentsNextPageToken}
+			></CommentsCard>
 		</div>
 	</div>
 </main>
