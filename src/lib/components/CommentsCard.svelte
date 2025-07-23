@@ -3,27 +3,73 @@
 	import type { CommentThread } from '$lib/types/commentThread';
 	import CommentReply from '$lib/components/CommentReply.svelte';
 	import type { Video } from '$lib/api/mock';
+	import { inview } from 'svelte-inview';
+	import { page } from '$app/state';
 
 	let {
 		comments,
-		video
+		video,
+		commentsNextPageToken
 	}: {
-		comments: CommentThread[];
+		comments: Promise<CommentThread[]>;
 		video: Promise<Video | null>;
+		commentsNextPageToken: Promise<string | undefined>;
 	} = $props();
-	//video is used to get the comment count
-	//with video.statistics.commentCount we can get the number of comments, but it is a promise
 
+	let allComments = $state<CommentThread[]>([]);
+	let nextPageToken = $state<string | undefined>(undefined);
+	let isLoaded = $state(false);
 	let newComment = $state('');
 	let show = $state(false);
 
 	// Combina entrambe le Promise per un loading unificato
 	const dataPromise = Promise.all([comments, video]);
+
+	async function loadMoreComments() {
+		if (!nextPageToken) return;
+
+		try {
+			const response = await fetch(
+				`/api/comments?videoId=${page.params.videoId}&pageToken=${nextPageToken}`
+			);
+			const newCommentsData = await response.json();
+
+			// Filtra commenti duplicati
+			const existingIds = new Set(allComments.map((c) => c.id));
+			const newUniqueComments = newCommentsData.comments.filter(
+				(comment: CommentThread) => !existingIds.has(comment.id)
+			);
+
+			allComments = [...allComments, ...newUniqueComments];
+			nextPageToken = newCommentsData.nextPageToken;
+		} catch (error) {
+			console.error('Error loading more comments:', error);
+		}
+	}
+
+	// Inizializza i commenti quando le Promise si risolvono o quando cambia il video
+	$effect(() => {
+		// Reset state quando cambia il video
+		isLoaded = false;
+		allComments = [];
+		nextPageToken = undefined;
+
+		Promise.all([comments, commentsNextPageToken])
+			.then(([initialComments, token]) => {
+				allComments = initialComments;
+				nextPageToken = token;
+				isLoaded = true;
+			})
+			.catch((error) => {
+				console.error('Error loading comments:', error);
+				isLoaded = true;
+			});
+	});
 </script>
 
 <div class="bg-background-secondary text-primary m-auto mt-10 flex flex-col gap-3 rounded-2xl p-4">
 	{#await dataPromise}
-		<p>Caricamento dei commenti e informazioni video...</p>
+		<p class="text-secondary">Caricamento dei commenti ...</p>
 	{:then [resolvedComments, resolvedVideo]}
 		<h1 class="text-primary mb-2 p-2 font-bold">
 			{resolvedVideo?.statistics?.commentCount || 0} commenti
@@ -67,26 +113,26 @@
 				</div>
 			{/if}
 		</form>
-		<!--Each thread comments is here-->
-		{#each resolvedComments as comment (comment.id)}
+
+		<!-- Mostra i commenti (prima quelli iniziali, poi quelli caricati dinamicamente) -->
+		{#each isLoaded ? allComments : resolvedComments as comment (comment.id)}
 			<CommentCard commentData={comment.topLevelComment}></CommentCard>
-			<!--
-			Here we have the replies
-			-->
 			{#if comment.replies && comment.replies.length > 0}
 				<div class="ml-4">
 					<p class="text-secondary">Risposte:</p>
 				</div>
 			{/if}
-			<!--TODO: Replies Should have a different style-->
 			{#each comment.replies as reply (reply.id)}
 				<CommentReply commentData={reply}></CommentReply>
 			{/each}
 		{/each}
-		<button
-			class="bg-background-secondary hover:bg-background-tertiary text-primary cursor-pointer rounded-2xl p-2 font-semibold"
-			>Mostra altro</button
-		>
+
+		<!-- Infinite scroll trigger -->
+		{#if nextPageToken}
+			<div use:inview={{ threshold: 0.1 }} oninview_enter={loadMoreComments}>
+				<p class="text-secondary text-center">Caricamento commenti...</p>
+			</div>
+		{/if}
 	{:catch error}
 		<p class="text-red-500">Errore nel caricamento: {error?.message || error}</p>
 	{/await}
