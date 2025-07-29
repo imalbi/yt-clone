@@ -5,7 +5,9 @@
 	import SideBarOverlay from '$lib/components/sideBarOverlay.svelte';
 	import { page } from '$app/state';
 	import { onMount } from 'svelte';
+	import { userStore } from '$lib/stores/userStore';
 
+	let { data, children } = $props();
 	let isMenuOpen = $state(false);
 
 	let inputSearch = $state('');
@@ -13,9 +15,12 @@
 	function handleToggleMenu() {
 		isMenuOpen = !isMenuOpen;
 	}
-	let { children } = $props();
 
 	let isMobile = $state(false);
+	$effect(() => {
+		// Aggiorna lo stato dell'input di ricerca quando cambia il percorso della pagina
+		$userStore = data.user;
+	});
 
 	onMount(() => {
 		if (typeof window !== 'undefined') {

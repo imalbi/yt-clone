@@ -3,11 +3,13 @@
 	import { goto } from '$app/navigation';
 	import { onMount } from 'svelte';
 	let { onToggle, inputSearch } = $props();
+	import { isLogged, userStore } from '$lib/stores/userStore';
 	let user = {
 		img: avatar
 	};
 	let showOnlySearch = $state(false);
 	let isMobile = $state(false);
+	let showProfile = $state(false);
 
 	onMount(() => {
 		if (typeof window !== 'undefined') {
@@ -26,7 +28,7 @@
 		}
 	}
 
-	let timeout: number;
+	let timeout: ReturnType<typeof setTimeout>;
 	function debounceSearch() {
 		clearTimeout(timeout);
 		timeout = setTimeout(() => {
@@ -172,53 +174,102 @@
 		<!--Container for buttons: add new video button, notifications, avatar-->
 		<div class="order-3 mr-1 flex flex-shrink-0 items-center gap-1">
 			<!--add new video button-->
-			<button
-				class="bg-background-secondary hover:bg-background-tertiary flex h-10 cursor-pointer items-center rounded-3xl p-2 pr-4 font-semibold"
-			>
-				<svg
-					class="h-6 w-6"
-					xmlns="http://www.w3.org/2000/svg"
-					viewBox="0 0 24 24"
-					fill="none"
-					stroke="currentColor"
-					stroke-width="2"
-					stroke-linecap="round"
-					stroke-linejoin="round"
-					aria-hidden="true"
+			{#if $isLogged}
+				<button
+					class="bg-background-secondary hover:bg-background-tertiary flex h-10 cursor-pointer items-center rounded-3xl p-2 pr-4 font-semibold"
 				>
-					<line x1="12" y1="8" x2="12" y2="16" class="stroke-current" />
-					<line x1="8" y1="12" x2="16" y2="12" class="stroke-current" />
-				</svg>
-				Crea
-			</button>
+					<svg
+						class="h-6 w-6"
+						xmlns="http://www.w3.org/2000/svg"
+						viewBox="0 0 24 24"
+						fill="none"
+						stroke="currentColor"
+						stroke-width="2"
+						stroke-linecap="round"
+						stroke-linejoin="round"
+						aria-hidden="true"
+					>
+						<line x1="12" y1="8" x2="12" y2="16" class="stroke-current" />
+						<line x1="8" y1="12" x2="16" y2="12" class="stroke-current" />
+					</svg>
+					Crea
+				</button>
 
-			<!-- Notifiche -->
-			<button
-				class="bg-background hover:bg-background-secondary hidden h-10 w-10 cursor-pointer items-center justify-center rounded-full md:flex"
-				aria-label="Notifiche"
-			>
-				<svg
-					class="h-6 w-6"
-					xmlns="http://www.w3.org/2000/svg"
-					viewBox="0 0 24 24"
-					fill="none"
-					stroke="currentColor"
-					stroke-width="2"
-					stroke-linecap="round"
-					stroke-linejoin="round"
-					aria-hidden="true"
+				<!-- Notifiche -->
+				<button
+					class="bg-background hover:bg-background-secondary hidden h-10 w-10 cursor-pointer items-center justify-center rounded-full md:flex"
+					aria-label="Notifiche"
 				>
-					<path
-						class="stroke-current"
-						d="M18 16v-5a6 6 0 10-12 0v5a2 2 0 01-2 2h16a2 2 0 01-2-2z"
-					/>
-					<path class="stroke-current" d="M13.73 21a2 2 0 01-3.46 0" />
-				</svg>
-			</button>
-			<!-- Avatar -->
-			<button class="h-10 w-10 cursor-pointer rounded-full"
-				><img class="rounded-full" src={user.img} alt="" /></button
-			>
+					<svg
+						class="h-6 w-6"
+						xmlns="http://www.w3.org/2000/svg"
+						viewBox="0 0 24 24"
+						fill="none"
+						stroke="currentColor"
+						stroke-width="2"
+						stroke-linecap="round"
+						stroke-linejoin="round"
+						aria-hidden="true"
+					>
+						<path
+							class="stroke-current"
+							d="M18 16v-5a6 6 0 10-12 0v5a2 2 0 01-2 2h16a2 2 0 01-2-2z"
+						/>
+						<path class="stroke-current" d="M13.73 21a2 2 0 01-3.46 0" />
+					</svg>
+				</button>
+				<!-- Avatar -->
+				<button
+					class="h-10 w-10 cursor-pointer rounded-full"
+					onclick={() => (showProfile = !showProfile)}
+					aria-label="Profilo Utente"
+				>
+					<img class="rounded-full" src={$userStore?.picture} alt="Profile" />
+				</button>
+			{:else}
+				<!-- Login button -->
+				<button
+					class="bg-background-secondary hover:bg-background-tertiary flex h-10 cursor-pointer items-center rounded-3xl p-2 pr-4 font-semibold"
+					onclick={() => goto('/api/auth/login')}
+				>
+					<svg
+						class="h-6 w-6"
+						xmlns="http://www.w3.org/2000/svg"
+						viewBox="0 0 24 24"
+						fill="currentColor"
+						aria-hidden="true"
+					>
+						<circle cx="12" cy="8" r="4" />
+						<path d="M4 20c0-4 4-6 8-6s8 2 8 6" />
+					</svg>
+					<span class="ml-2">Accedi</span>
+				</button>
+			{/if}
 		</div>
 	{/if}
 </nav>
+{#if showProfile}
+	<div
+		class="bg-background-secondary text-primary fixed top-0 right-0 z-50 mt-16 w-64 transform rounded-lg p-4"
+		role="dialog"
+		aria-modal="true"
+		tabindex="0"
+		onkeydown={(e) => e.key === 'Escape' && (showProfile = false)}
+	>
+		<!-- Overlay per click fuori -->
+		<button
+			type="button"
+			class="fixed inset-0 z-40"
+			style="background: transparent;"
+			aria-label="Chiudi profilo"
+			tabindex="0"
+			onclick={() => (showProfile = false)}
+			onkeydown={(e) => (e.key === 'Enter' || e.key === ' ') && (showProfile = false)}
+		></button>
+		<ul class="relative z-50">
+			<li><a href="/profile">Il tuo profilo</a></li>
+			<li><a href="/settings">Impostazioni</a></li>
+			<li><a href="/api/auth/logout">Esci</a></li>
+		</ul>
+	</div>
+{/if}
