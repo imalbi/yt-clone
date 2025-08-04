@@ -112,3 +112,7 @@ export function formatTimeAgo(isoDateString: string) {
 	const years = Math.floor(secondsAgo / 31536000);
 	return years === 1 ? '1 anno fa' : `${years} anni fa`;
 }
+// Genera un numero intero casuale tra min (inclusivo) e max (esclusivo).
+export function randomInt(min: number, max: number): number {
+	return Math.floor(Math.random() * (max - min)) + min;
+}

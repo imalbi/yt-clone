@@ -35,7 +35,7 @@
 </script>
 
 <TopBar onToggle={handleToggleMenu} {inputSearch} />
-<div class="flex flex-row pt-16">
+<div class="flex flex-row pt-18">
 	{#if page.url.pathname.startsWith('/video/')}
 		<!-- No sidebar for video pages -->
 		{@render children()}
