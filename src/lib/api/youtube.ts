@@ -316,7 +316,50 @@ export async function getSubscriptions(accessToken: string): Promise<Channel[]> 
 		const channelIds = data.items.map((item: any) => item.snippet.resourceId.channelId).join(',');
 
 		const channels = await getChannelsByIds(channelIds);
-		return channels;
+		// Add subscriptionId to each channel
+		const subscriptions = data.items.map((item: any) => {
+			const channel = channels.find((c) => c.id === item.snippet.resourceId.channelId);
+			if (channel) {
+				channel.subscriptionId = item.id;
+			}
+			return channel;
+		});
+
+		return subscriptions.filter((c: Channel | undefined): c is Channel => !!c);
+	} catch (error) {
+		console.error(error);
+		throw error;
+	}
+}
+
+/**
+ *
+ * @param subscriptionId id univoco della sottoscrizione da annullare
+ * @param accessToken token di accesso dell'utente
+ */
+export async function unsubscribeFromChannel(
+	subscriptionId: string,
+	accessToken: string
+): Promise<void> {
+	if (!subscriptionId) {
+		throw new Error('Subscription ID is required');
+	}
+	if (!accessToken) {
+		throw new Error('Access token is required');
+	}
+	try {
+		const response = await fetch(`${BASE_URL}/subscriptions?id=${subscriptionId}`, {
+			method: 'DELETE',
+			headers: {
+				Authorization: `Bearer ${accessToken}`
+			}
+		});
+
+		if (!response.ok) {
+			const errorText = await response.text();
+			console.error('Failed to unsubscribe from channel', response.status, errorText);
+			throw new Error(`Failed to unsubscribe from channel: ${response.status}`);
+		}
 	} catch (error) {
 		console.error(error);
 		throw error;

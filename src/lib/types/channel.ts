@@ -1,5 +1,6 @@
 export interface Channel {
 	id: string;
+	subscriptionId?: string; // Optional, used to store the subscription ID if available
 	title: string;
 	description: string;
 	customUrl: string;

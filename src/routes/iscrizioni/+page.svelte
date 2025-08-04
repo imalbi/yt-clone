@@ -2,14 +2,46 @@
 	import { formatSubscriberCount } from '$lib/scripts/scripts';
 	import type { PageData } from './$types';
 
-	export let data: PageData;
+	let { data }: { data: PageData } = $props();
+
+	// Crea una copia reattiva dei dati
+	let subscriptions = $state(data.subscriptions || []);
+
+	function getThumbnailUrl(thumbnails: any) {
+		let url = '';
+		if (thumbnails?.medium?.url) url = thumbnails.medium.url;
+		else if (thumbnails?.default?.url) url = thumbnails.default.url;
+		else if (thumbnails?.high?.url) url = thumbnails.high.url;
+		else return 'https://via.placeholder.com/88x88?text=No+Image';
+
+		// Forza il reload rimuovendo parametri che potrebbero causare problemi
+		return url.replace(/=s\d+-c-k-c0x00ffffff-no-rj/, '=s240-c-k-c0x00ffffff-no-rj');
+	}
+
+	async function unsubscribe(subscriptionId: string | undefined) {
+		if (!subscriptionId) return;
+		const response = await fetch('/api/user/unsubscribe', {
+			method: 'POST',
+			headers: {
+				'Content-Type': 'application/json'
+			},
+			body: JSON.stringify({ subscriptionId })
+		});
+
+		if (response.ok) {
+			// Aggiorna la lista reattiva
+			subscriptions = subscriptions.filter((sub) => sub.subscriptionId !== subscriptionId);
+		} else {
+			alert('Failed to unsubscribe. Please try again.');
+		}
+	}
 </script>
 
 <main class="text-primary bg-background p-4 px-6 xl:m-auto xl:w-[55%]">
 	<h1 class=" mb-2 text-4xl font-bold">Tutte le iscrizioni</h1>
-	{#if data.subscriptions}
+	{#if subscriptions && subscriptions.length > 0}
 		<ul role="list">
-			{#each data.subscriptions as channel (channel.id)}
+			{#each subscriptions as channel (channel.id)}
 				<li class="flex flex-row justify-between gap-2 p-4">
 					<a
 						href={`https://www.youtube.com/channel/${channel.id}`}
@@ -19,10 +51,9 @@
 					>
 						<div class="flex flex-row gap-2">
 							<img
-								loading="lazy"
 								class="size-30 rounded-full object-cover"
-								src={channel.thumbnails.high.url}
-								alt="User Avatar"
+								src={getThumbnailUrl(channel.thumbnails)}
+								alt="{channel.title} Avatar"
 							/>
 							<div>
 								<h2 class="hover:font-bold">{channel.title}</h2>
@@ -40,8 +71,9 @@
 					</a>
 					<div class=" hidden items-center justify-center md:flex">
 						<button
+							onclick={() => unsubscribe(channel.subscriptionId)}
 							class="bg-background-secondary ml-2 h-fit cursor-pointer rounded-3xl px-4 py-2 align-middle font-semibold text-white"
-							>Iscritto</button
+							>Disiscriviti</button
 						>
 					</div>
 				</li>

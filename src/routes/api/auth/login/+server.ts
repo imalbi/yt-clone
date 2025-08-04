@@ -11,11 +11,19 @@ export function GET() {
 	youtubeAuthURL.searchParams.set('response_type', 'code');
 	youtubeAuthURL.searchParams.set(
 		'scope',
-		'https://www.googleapis.com/auth/youtube.readonly https://www.googleapis.com/auth/userinfo.profile https://www.googleapis.com/auth/userinfo.email'
+		[
+			'https://www.googleapis.com/auth/youtube',
+			'https://www.googleapis.com/auth/youtube.force-ssl',
+			'https://www.googleapis.com/auth/youtube.readonly',
+			'https://www.googleapis.com/auth/youtube.upload',
+			'https://www.googleapis.com/auth/youtubepartner',
+			'https://www.googleapis.com/auth/youtubepartner-channel-audit',
+			'https://www.googleapis.com/auth/userinfo.profile',
+			'https://www.googleapis.com/auth/userinfo.email'
+		].join(' ')
 	);
-	youtubeAuthURL.searchParams.set('access_type', 'offline'); // Necessario per ottenere un refresh_token
-	youtubeAuthURL.searchParams.set('prompt', 'consent'); // Forza la richiesta di consenso
+	youtubeAuthURL.searchParams.set('access_type', 'offline');
+	youtubeAuthURL.searchParams.set('prompt', 'consent');
 
-	// Reindirizza l'utente alla pagina di login di YouTube
 	throw redirect(302, youtubeAuthURL.toString());
 }
