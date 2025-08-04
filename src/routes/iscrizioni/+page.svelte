@@ -44,7 +44,7 @@
 			{#each subscriptions as channel (channel.id)}
 				<li class="flex flex-row justify-between gap-2 p-4">
 					<a
-						href={`https://www.youtube.com/channel/${channel.id}`}
+						href={`/channel/${channel.id}`}
 						target="_blank"
 						rel="noopener noreferrer"
 						class="flex flex-row gap-2"

@@ -1,5 +1,4 @@
 <script lang="ts">
-	import ChannelHeader from '$lib/components/ChannelHeader.svelte';
 	import VideoCard from '$lib/components/videoCard.svelte';
 	import SkeletonHome from '$lib/components/SkeletonHome.svelte';
 	import { inview } from 'svelte-inview';
@@ -49,36 +48,25 @@
 	});
 </script>
 
-<main class="w-full">
-	{#await data.channel}
-		<!-- TODO: Add a skeleton for the channel header -->
-		<div class="h-60 w-full animate-pulse bg-gray-200"></div>
-	{:then channel}
-		<ChannelHeader {channel} />
-	{:catch error}
-		<p>Error loading channel: {error.message}</p>
-	{/await}
-
-	<div class="grid grid-cols-1 gap-4 p-4 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
-		{#if error}
-			<p>
-				<strong class="text-primary">Errore nel caricamento dei video: {error}</strong>
-			</p>
-		{:else if !isLoaded}
-			{#each Array(8) as _}
+<div class="grid grid-cols-1 gap-4 p-4 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
+	{#if error}
+		<p>
+			<strong class="text-primary">Errore nel caricamento dei video: {error}</strong>
+		</p>
+	{:else if !isLoaded}
+		{#each Array(8) as _}
+			<SkeletonHome />
+		{/each}
+	{:else}
+		{#each videos as video (video.id)}
+			<div in:fly|local={{ y: 50, duration: 200 }}>
+				<VideoCard {video} />
+			</div>
+		{/each}
+		{#if nextPageToken}
+			<div use:inview={{ threshold: 0.1 }} oninview_enter={loadMoreVideos}>
 				<SkeletonHome />
-			{/each}
-		{:else}
-			{#each videos as video (video.id)}
-				<div in:fly|local={{ y: 50, duration: 200 }}>
-					<VideoCard {video} />
-				</div>
-			{/each}
-			{#if nextPageToken}
-				<div use:inview={{ threshold: 0.1 }} oninview_enter={loadMoreVideos}>
-					<SkeletonHome />
-				</div>
-			{/if}
+			</div>
 		{/if}
-	</div>
-</main>
+	{/if}
+</div>

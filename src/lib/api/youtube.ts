@@ -483,3 +483,49 @@ export async function getVideosByChannelId(
 		throw error;
 	}
 }
+
+/**
+ *
+ * @param subscriptionId id univoco della sottoscrizione da annullare
+ * @param accessToken token di accesso dell'utente
+ */
+export async function subscribeToChannel(
+	channelId: string,
+	accessToken: string
+): Promise<string | undefined> {
+	if (!channelId) {
+		throw new Error('Channel ID is required');
+	}
+	if (!accessToken) {
+		throw new Error('Access token is required');
+	}
+	try {
+		const response = await fetch(`${BASE_URL}/subscriptions?part=snippet`, {
+			method: 'POST',
+			headers: {
+				Authorization: `Bearer ${accessToken}`,
+				'Content-Type': 'application/json'
+			},
+			body: JSON.stringify({
+				snippet: {
+					resourceId: {
+						kind: 'youtube#channel',
+						channelId: channelId
+					}
+				}
+			})
+		});
+
+		if (!response.ok) {
+			const errorText = await response.text();
+			console.error('Failed to subscribe to channel', response.status, errorText);
+			throw new Error(`Failed to subscribe to channel: ${response.status}`);
+		}
+
+		const data = await response.json();
+		return data.id;
+	} catch (error) {
+		console.error(error);
+		throw error;
+	}
+}
