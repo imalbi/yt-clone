@@ -365,3 +365,121 @@ export async function unsubscribeFromChannel(
 		throw error;
 	}
 }
+
+/**
+ * @param channelId - The ID of the channel to retrieve.
+ * @returns A Channel object with the details of the channel or null if not found.
+ */
+export async function getChannelById(channelId: string): Promise<Channel | null> {
+	if (!channelId) {
+		throw new Error('Channel ID is required');
+	}
+	if (!PUBLIC_YOUTUBE_API_KEY) {
+		throw new Error('YouTube API key is not defined');
+	}
+	try {
+		const response = await fetch(
+			`${BASE_URL}/channels?part=snippet,statistics,brandingSettings&id=${channelId}&key=${PUBLIC_YOUTUBE_API_KEY}`
+		);
+		if (!response.ok) {
+			throw new Error('Failed to fetch channel');
+		}
+		const data = await response.json();
+		if (data.items.length === 0) {
+			return null;
+		}
+		const item = data.items[0];
+		return {
+			id: item.id,
+			title: item.snippet.title,
+			description: item.snippet.description,
+			customUrl: item.snippet.customUrl,
+			publishedAt: item.snippet.publishedAt,
+			thumbnails: item.snippet.thumbnails,
+			statistics: item.statistics,
+			brandingSettings: {
+				image: {
+					bannerExternalUrl: item.brandingSettings.image?.bannerExternalUrl
+				}
+			}
+		};
+	} catch (error) {
+		console.error(error);
+		throw error;
+	}
+}
+
+export async function getVideosByChannelId(
+	channelId: string,
+	pageToken?: string
+): Promise<{ videos: Video[]; nextPageToken?: string }> {
+	if (!channelId) {
+		throw new Error('Channel ID is required');
+	}
+	if (!PUBLIC_YOUTUBE_API_KEY) {
+		throw new Error('YouTube API key is not defined');
+	}
+	try {
+		let url = `${BASE_URL}/search?part=snippet&channelId=${channelId}&type=video&maxResults=20&key=${PUBLIC_YOUTUBE_API_KEY}`;
+		if (pageToken) {
+			url += `&pageToken=${pageToken}`;
+		}
+		const response = await fetch(url);
+		if (!response.ok) {
+			throw new Error('Failed to fetch videos');
+		}
+		const data = await response.json();
+
+		const videoIds = data.items.map((item: any) => item.id.videoId).join(',');
+		if (!videoIds) {
+			return {
+				videos: [],
+				nextPageToken: data.nextPageToken
+			};
+		}
+		const videosResponse = await fetch(
+			`${BASE_URL}/videos?part=snippet,statistics,contentDetails&id=${videoIds}&key=${PUBLIC_YOUTUBE_API_KEY}`
+		);
+		if (!videosResponse.ok) {
+			throw new Error('Failed to fetch video details');
+		}
+		const videosData = await videosResponse.json();
+
+		const channelIds = videosData.items.map((item: any) => item.snippet.channelId).join(',');
+		const channels = await getChannelsByIds(channelIds);
+
+		const videos = videosData.items.map((item: any) => {
+			const channel = channels.find((c) => c.id === item.snippet.channelId);
+			return {
+				id: item.id,
+				title: item.snippet.title,
+				desc: item.snippet.description,
+				thumbnails: {
+					default: item.snippet.thumbnails.default?.url || '',
+					medium: item.snippet.thumbnails.medium?.url || '',
+					high: item.snippet.thumbnails.high?.url || '',
+					standard: item.snippet.thumbnails.standard?.url,
+					maxres: item.snippet.thumbnails.maxres?.url
+				},
+				publishedAt: item.snippet.publishedAt,
+				channelId: item.snippet.channelId,
+				channelTitle: item.snippet.channelTitle,
+				avatarUrl: channel?.thumbnails.default.url,
+				statistics: {
+					viewCount: item.statistics?.viewCount || '0',
+					likeCount: item.statistics?.likeCount || '0',
+					commentCount: item.statistics?.commentCount || '0',
+					favoriteCount: item.statistics?.favoriteCount || '0'
+				}
+			};
+		});
+
+		return {
+			videos: videos,
+			nextPageToken: data.nextPageToken
+		};
+	} catch (error) {
+		console.error(error);
+		throw error;
+	}
+}

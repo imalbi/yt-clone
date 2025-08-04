@@ -28,4 +28,9 @@ export interface Channel {
 		hiddenSubscriberCount: boolean;
 		videoCount: string;
 	};
+	brandingSettings?: {
+		image?: {
+			bannerExternalUrl: string;
+		};
+	};
 }
