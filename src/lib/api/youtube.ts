@@ -70,7 +70,7 @@ export async function getVideos(
  * @param channelIds - A comma-separated string of channel IDs.
  * @returns A list of channels.
  */
-async function getChannelsByIds(channelIds: string): Promise<Channel[]> {
+export async function getChannelsByIds(channelIds: string): Promise<Channel[]> {
 	if (!PUBLIC_YOUTUBE_API_KEY) {
 		throw new Error('YouTube API key is not defined');
 	}
@@ -280,6 +280,43 @@ export async function searchVideos(
 			videos: videos,
 			nextPageToken: data.nextPageToken
 		};
+	} catch (error) {
+		console.error(error);
+		throw error;
+	}
+}
+
+/**
+ *
+ * @param accessToken
+ * @returns channel subscriptions for the authenticated user
+ */
+export async function getSubscriptions(accessToken: string): Promise<Channel[]> {
+	if (!accessToken) {
+		throw new Error('Access token is required');
+	}
+	try {
+		const response = await fetch(`${BASE_URL}/subscriptions?part=snippet&mine=true&maxResults=50`, {
+			headers: {
+				Authorization: `Bearer ${accessToken}`
+			}
+		});
+
+		if (!response.ok) {
+			const errorText = await response.text();
+			console.error('Failed to fetch subscriptions', response.status, errorText);
+			throw new Error(`Failed to fetch subscriptions: ${response.status}`);
+		}
+
+		const data = await response.json();
+		if (!data.items || data.items.length === 0) {
+			return [];
+		}
+
+		const channelIds = data.items.map((item: any) => item.snippet.resourceId.channelId).join(',');
+
+		const channels = await getChannelsByIds(channelIds);
+		return channels;
 	} catch (error) {
 		console.error(error);
 		throw error;

@@ -1,6 +1,5 @@
 //src/routes/iscrizioni/+page.server.ts
-import { PUBLIC_YOUTUBE_API_KEY } from '$env/static/public';
-import { userStore } from '$lib/stores/userStore';
+import { getSubscriptions } from '$lib/api/youtube';
 import { redirect } from '@sveltejs/kit';
 
 export async function load({ cookies }) {
@@ -9,15 +8,14 @@ export async function load({ cookies }) {
 		throw redirect(302, '/api/auth/login');
 	}
 	try {
-		const response = await fetch('https://dummyjson.com/users');
-		const data = await response.json();
+		const subscriptions = await getSubscriptions(accessToken);
 		return {
-			users: data.users
+			subscriptions
 		};
 	} catch (error) {
-		console.error('Error fetching users:', error);
+		console.error('Error fetching subscriptions:', error);
 		return {
-			error: 'Failed to load users'
+			error: 'Failed to load subscriptions'
 		};
 	}
 }
