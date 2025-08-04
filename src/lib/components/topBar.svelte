@@ -269,7 +269,11 @@
 		<ul class="relative z-50">
 			<li><a href="/profile">Il tuo profilo</a></li>
 			<li><a href="/settings">Impostazioni</a></li>
-			<li><a href="/api/auth/logout">Esci</a></li>
+			<li>
+				<form method="post" action="/api/auth/logout">
+					<button type="submit" class="w-full text-left">Esci</button>
+				</form>
+			</li>
 		</ul>
 	</div>
 {/if}
