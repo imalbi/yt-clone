@@ -9,7 +9,6 @@
 	import { inview } from 'svelte-inview';
 
 	let { data } = $props();
-	$inspect(data);
 	let videos = $state<Video[]>([]);
 	let nextPageToken: string | undefined = $state(undefined);
 	let isLoaded = $state(false);

@@ -529,3 +529,42 @@ export async function subscribeToChannel(
 		throw error;
 	}
 }
+/**
+ *
+ * @param videoId ID del video da valutare
+ * @param rating Valutazione da assegnare (like, dislike, none)
+ * @param accessToken Token di accesso dell'utente
+ * @returns true se la valutazione è stata inviata con successo
+ */
+export async function rateVideo(
+	videoId: string,
+	rating: 'like' | 'dislike' | 'none',
+	accessToken: string
+): Promise<boolean> {
+	if (!videoId) {
+		throw new Error('Video ID is required');
+	}
+	if (!accessToken) {
+		throw new Error('Access token is required');
+	}
+	try {
+		const response = await fetch(`${BASE_URL}/videos/rate?id=${videoId}&rating=${rating}`, {
+			method: 'POST',
+			headers: {
+				Authorization: `Bearer ${accessToken}`,
+				'Content-Type': 'application/json'
+			}
+		});
+
+		if (response.status === 204) {
+			return true;
+		}
+
+		const errorText = await response.text();
+		console.error('Failed to rate video', response.status, errorText);
+		throw new Error(`Failed to rate video: ${response.status}`);
+	} catch (error) {
+		console.error(error);
+		throw error;
+	}
+}
