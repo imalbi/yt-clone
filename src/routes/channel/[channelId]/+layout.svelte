@@ -1,34 +1,34 @@
 <script lang="ts">
 	import ChannelHeader from '$lib/components/ChannelHeader.svelte';
 	import { page } from '$app/state';
-
 	let { data, children } = $props();
-	const channelId = page.params.channelId;
+	let aClass = 'text-primary hover:border-secondary px-4 py-2 hover:border-b-2';
+	$inspect(page);
 </script>
 
-<main class="w-full">
+<main class="w-full xl:m-auto xl:w-[80%]">
 	{#if data.channel}
-		<ChannelHeader channel={data.channel} subscriptions={data.subscriptions} />
+		<ChannelHeader channel={data.channel} />
 
-		<nav class="flex border-b border-gray-200">
+		<nav class="flex gap-2 pb-2">
 			<a
-				href={`/channel/${channelId}`}
-				class="px-4 py-2"
-				class:active={page.url.pathname === `/channel/${channelId}`}
+				href={`/channel/${page.params.channelId}`}
+				class={aClass}
+				class:active={page.url.pathname === `/channel/${page.params.channelId}`}
 			>
 				Videos
 			</a>
 			<a
-				href={`/channel/${channelId}/Posts`}
-				class="px-4 py-2"
-				class:active={page.url.pathname === `/channel/${channelId}/Posts`}
+				href={`/channel/${page.params.channelId}/Posts`}
+				class={aClass}
+				class:active={page.url.pathname === `/channel/${page.params.channelId}/Posts`}
 			>
 				Posts
 			</a>
 			<a
-				href={`/channel/${channelId}/playlists`}
-				class="px-4 py-2"
-				class:active={page.url.pathname === `/channel/${channelId}/playlists`}
+				href={`/channel/${page.params.channelId}/playlists`}
+				class={aClass}
+				class:active={page.url.pathname === `/channel/${page.params.channelId}/playlists`}
 			>
 				Playlists
 			</a>
@@ -42,7 +42,7 @@
 
 <style>
 	.active {
-		border-bottom: 2px solid blue;
-		color: blue;
+		border-bottom: 2px solid var(--text-primary);
+		font-weight: bold;
 	}
 </style>

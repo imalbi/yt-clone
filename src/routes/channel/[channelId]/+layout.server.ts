@@ -1,8 +1,9 @@
-import { getChannelById } from '$lib/api/youtube';
+import { getChannelById, getSubscriptions } from '$lib/api/youtube';
 import { error } from '@sveltejs/kit';
 
-export async function load({ params }) {
+export async function load({ params, cookies }) {
 	const { channelId } = params;
+	const accessToken = cookies.get('access_token');
 
 	console.log('Layout loading channel:', channelId);
 
@@ -13,7 +14,10 @@ export async function load({ params }) {
 
 	try {
 		console.log('Fetching channel data for:', channelId);
-		const channel = await getChannelById(channelId);
+		const channelPromise = getChannelById(channelId);
+		const subscriptionsPromise = accessToken ? getSubscriptions(accessToken) : Promise.resolve([]);
+
+		const [channel, subscriptions] = await Promise.all([channelPromise, subscriptionsPromise]);
 
 		if (!channel) {
 			console.log('Channel not found in API response');
@@ -21,8 +25,11 @@ export async function load({ params }) {
 		}
 
 		console.log('Channel loaded successfully:', channel.title);
+		console.log('Subscriptions loaded:', subscriptions.length);
+
 		return {
-			channel
+			channel,
+			subscriptions
 		};
 	} catch (err) {
 		console.error('Error in layout.server.ts:', err);

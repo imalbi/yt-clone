@@ -1,7 +1,6 @@
 <script lang="ts">
 	import VideoCard from '$lib/components/videoCard.svelte';
 	import SkeletonHome from '$lib/components/SkeletonHome.svelte';
-	import { inview } from 'svelte-inview';
 	import { fly } from 'svelte/transition';
 	import type { Video } from '$lib/api/mock';
 	import { page } from '$app/stores';
@@ -63,10 +62,5 @@
 				<VideoCard {video} />
 			</div>
 		{/each}
-		{#if nextPageToken}
-			<div use:inview={{ threshold: 0.1 }} oninview_enter={loadMoreVideos}>
-				<SkeletonHome />
-			</div>
-		{/if}
 	{/if}
 </div>
