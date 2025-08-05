@@ -23,7 +23,6 @@
 		videos = [...videos, ...newVideosData.videos];
 		nextPageToken = newVideosData.nextPageToken;
 	}
-	//TODO: fix unlike and undislike behavior
 
 	// Initialize data when promises resolve or when video changes
 	$effect(() => {
@@ -54,7 +53,7 @@
 </script>
 
 <main class="w-full p-4 xl:p-8">
-	<div class="xl:grid-rows-auto grid grid-cols-1 gap-8 xl:grid-cols-[1fr_440px]">
+	<div class="grid grid-cols-1 gap-8 xl:grid-cols-[1fr_440px] xl:grid-rows-[auto_1fr]">
 		<div class="w-full xl:col-start-1 xl:row-start-1">
 			{#await data.video}
 				<SkeletonPlayer />
@@ -103,7 +102,7 @@
 			</button>
 		</div>
 
-		<div class="w-full xl:col-start-1 xl:row-start-2">
+		<div class="w-full xl:col-start-1 xl:row-start-2 xl:min-h-0">
 			<CommentsCard
 				comments={data.comments}
 				video={data.video}
