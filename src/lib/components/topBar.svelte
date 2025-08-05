@@ -1,12 +1,8 @@
 <script lang="ts">
-	import avatar from '$lib/assets/avatar.webp';
 	import { goto } from '$app/navigation';
 	import { onMount } from 'svelte';
 	let { onToggle, inputSearch } = $props();
 	import { isLogged, userStore } from '$lib/stores/userStore';
-	let user = {
-		img: avatar
-	};
 	let showOnlySearch = $state(false);
 	let isMobile = $state(false);
 	let showProfile = $state(false);

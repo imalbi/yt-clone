@@ -111,6 +111,7 @@
 							? 'bg-background-secondary text-primary'
 							: 'bg-primary'}"
 						onclick={handleSubscription}
+						disabled={isLoading}
 					>
 						{isSubscribed ? 'Iscritto' : 'Iscriviti'}
 					</button>

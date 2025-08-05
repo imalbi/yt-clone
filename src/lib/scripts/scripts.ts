@@ -116,3 +116,16 @@ export function formatTimeAgo(isoDateString: string) {
 export function randomInt(min: number, max: number): number {
 	return Math.floor(Math.random() * (max - min)) + min;
 }
+
+export function formatData(dataIn: string) {
+	const dataPubblicazione = new Date(dataIn);
+
+	const opzioniDiFormattazione = {
+		day: '2-digit' as const,
+		month: 'short' as const,
+		year: 'numeric' as const
+	};
+	const formattatore = new Intl.DateTimeFormat('it-IT', opzioniDiFormattazione);
+	const stringaFormattata = formattatore.format(dataPubblicazione);
+	return stringaFormattata;
+}

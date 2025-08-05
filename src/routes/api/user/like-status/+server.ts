@@ -29,7 +29,19 @@ export const GET: RequestHandler = async ({ cookies, url }) => {
 		}
 
 		const data = await response.json();
-		const videoLiked = data.items && data.items.length > 0 ? data.items[0].rating === 'like' : null;
+
+		let videoLiked = null;
+		if (data.items && data.items.length > 0) {
+			const rating = data.items[0].rating;
+
+			if (rating === 'like') {
+				videoLiked = true;
+			} else if (rating === 'dislike') {
+				videoLiked = false;
+			} else {
+				videoLiked = null; // 'none' or any other value
+			}
+		}
 
 		return json({
 			videoLiked

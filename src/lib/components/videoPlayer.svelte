@@ -1,33 +1,18 @@
 <script lang="ts">
 	import DescriptionBox from './DescriptionBox.svelte';
 	import SkeletonPlayer from './SkeletonPlayer.svelte';
-	import { formatSubscriberCount } from '$lib/scripts/scripts';
+	import { formatSubscriberCount, formatData } from '$lib/scripts/scripts';
 	import { userStore } from '$lib/stores/userStore';
-	import { redirect } from '@sveltejs/kit';
 	import { goto } from '$app/navigation';
 	let { video } = $props();
 
-	//FORMAT DATA may be already impl elsewhere but i'm not touching for now
-	function formatData(dataIn: string) {
-		const dataPubblicazione = new Date(dataIn);
-
-		const opzioniDiFormattazione = {
-			day: '2-digit' as const,
-			month: 'short' as const,
-			year: 'numeric' as const
-		};
-		const formattatore = new Intl.DateTimeFormat('it-IT', opzioniDiFormattazione);
-		const stringaFormattata = formattatore.format(dataPubblicazione);
-		return stringaFormattata;
-	}
-
-	//Working on
 	let isSubscribed = $state(false);
 	let subscriptionId = $state<string | undefined>(undefined);
 	let isLoading = $state(false);
 	let isLoadingLike = $state(false);
-	let videoLiked = $state<boolean | null>(null);
+	let videoLiked = $state<boolean | null>();
 
+	// Controlla se l'utente ha messo like o dislike al video
 	async function checkLike() {
 		try {
 			const response = await fetch(`/api/user/like-status?videoId=${video.id}`);
@@ -65,7 +50,7 @@
 			isSubscribed = false;
 			subscriptionId = undefined;
 		}
-	} // Controlla lo stato dell'iscrizione quando il componente viene montato o quando cambia il canale
+	} //Check subscription and like status when the component is mounted or when the video changes
 	$effect(() => {
 		// Only make API calls if user is authenticated
 		if (!$userStore) {
@@ -83,15 +68,19 @@
 			checkLike();
 		}
 	});
+
 	// Gestisce il like del video
 	async function handleLike() {
-		let rating = 'like';
 		if (!$userStore) {
 			goto('/api/auth/login');
+			return;
 		}
+
+		let rating = 'like';
 		if (videoLiked === true) {
-			rating = 'none'; // Already liked
+			rating = 'none'; // Already liked, so unlike it
 		}
+
 		isLoadingLike = true;
 		try {
 			const response = await fetch('/api/user/like', {
@@ -99,8 +88,9 @@
 				headers: { 'Content-Type': 'application/json' },
 				body: JSON.stringify({ videoId: video.id, rating: rating })
 			});
+
 			if (response.ok) {
-				videoLiked = rating === 'like' ? true : null; // Set to null if rating is 'none'
+				videoLiked = rating === 'like' ? true : null;
 			} else {
 				console.error('Failed to like video:', await response.text());
 			}
@@ -111,13 +101,16 @@
 		}
 	}
 
+	// Gestisce il dislike del video
 	async function handleDislike() {
-		let rating = 'dislike';
 		if (!$userStore) {
 			goto('/api/auth/login');
+			return;
 		}
+
+		let rating = 'dislike';
 		if (videoLiked === false) {
-			rating = 'none';
+			rating = 'none'; // Already disliked, so remove dislike
 		}
 
 		isLoadingLike = true;
@@ -127,8 +120,9 @@
 				headers: { 'Content-Type': 'application/json' },
 				body: JSON.stringify({ videoId: video.id, rating: rating })
 			});
+
 			if (response.ok) {
-				videoLiked = rating === 'dislike' ? false : null; // Set to null if rating is 'none'
+				videoLiked = rating === 'dislike' ? false : null;
 			} else {
 				console.error('Failed to dislike video:', await response.text());
 			}
