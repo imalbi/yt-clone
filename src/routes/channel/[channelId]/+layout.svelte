@@ -26,11 +26,11 @@
 				Posts
 			</a>
 			<a
-				href={`/channel/${page.params.channelId}/playlists`}
+				href={`/channel/${page.params.channelId}/info`}
 				class={aClass}
-				class:active={page.url.pathname === `/channel/${page.params.channelId}/playlists`}
+				class:active={page.url.pathname === `/channel/${page.params.channelId}/info`}
 			>
-				Playlists
+				Info
 			</a>
 		</nav>
 

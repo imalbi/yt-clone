@@ -1,6 +1,5 @@
 <script lang="ts">
 	import PostCard from '$lib/components/PostCard.svelte';
-	import type { Channel } from '$lib/types/channel';
 	let { data } = $props();
 	const posts = data.posts;
 </script>

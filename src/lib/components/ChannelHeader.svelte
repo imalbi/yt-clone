@@ -1,7 +1,7 @@
 <script lang="ts">
 	import type { Channel } from '$lib/types/channel';
 	import { userStore } from '$lib/stores/userStore';
-
+	import { formatSubscriberCount } from '$lib/scripts/scripts';
 	let { channel } = $props<{
 		channel: Channel;
 	}>();
@@ -41,7 +41,7 @@
 		}
 	} // Controlla lo stato dell'iscrizione quando il componente viene montato o quando cambia il canale
 	$effect(() => {
-		if (channel?.id) {
+		if (channel?.id && $userStore) {
 			checkSubscription();
 		}
 	});
@@ -102,17 +102,24 @@
 		<div class="ml-4">
 			<h1 class="text-primary text-2xl font-bold">{channel.title}</h1>
 			<p class="text-secondary">
-				{channel.statistics.subscriberCount} subscribers
+				{formatSubscriberCount(channel.statistics.subscriberCount)} subscribers
 			</p>
-			<div class="ml-auto">
+			<div class="">
 				{#if $userStore}
 					<button
-						class="rounded-full px-4 py-2 font-bold text-white {isSubscribed
-							? 'bg-gray-400'
-							: 'bg-red-600'}"
+						class="text-background mt-2 h-fit cursor-pointer rounded-3xl px-4 py-2 align-middle font-semibold {isSubscribed
+							? 'bg-background-secondary text-primary'
+							: 'bg-primary'}"
 						onclick={handleSubscription}
 					>
-						{isSubscribed ? 'Subscribed' : 'Subscribe'}
+						{isSubscribed ? 'Iscritto' : 'Iscriviti'}
+					</button>
+				{:else}
+					<button
+						class="bg-background-secondary rounded-full px-4 py-2 font-bold text-white"
+						onclick={() => (window.location.href = '/api/auth/login')}
+					>
+						Subscribe
 					</button>
 				{/if}
 			</div>

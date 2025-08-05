@@ -12,8 +12,7 @@ export async function load({ params }) {
 		const videosPromise = getVideosByChannelId(channelId);
 
 		return {
-			videos: videosPromise.then((data) => data.videos),
-			nextPageToken: videosPromise.then((data) => data.nextPageToken)
+			videos: videosPromise.then((data) => data.videos)
 		};
 	} catch (err) {
 		const message = err instanceof Error ? err.message : 'Unknown error';

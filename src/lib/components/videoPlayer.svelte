@@ -2,9 +2,10 @@
 	import DescriptionBox from './DescriptionBox.svelte';
 	import SkeletonPlayer from './SkeletonPlayer.svelte';
 	import { formatSubscriberCount } from '$lib/scripts/scripts';
+	import { userStore } from '$lib/stores/userStore';
 	let { video } = $props();
 
-	//FORMAT DATA
+	//FORMAT DATA may be already impl elsewhere but i'm not touching for now
 	function formatData(dataIn: string) {
 		const dataPubblicazione = new Date(dataIn);
 
@@ -16,6 +17,89 @@
 		const formattatore = new Intl.DateTimeFormat('it-IT', opzioniDiFormattazione);
 		const stringaFormattata = formattatore.format(dataPubblicazione);
 		return stringaFormattata;
+	}
+
+	//Working on
+	let isSubscribed = $state(false);
+	let subscriptionId = $state<string | undefined>(undefined);
+	let isLoading = $state(false);
+
+	// Controlla se l'utente è iscritto a questo canale
+	async function checkSubscription() {
+		if (!$userStore) {
+			isSubscribed = false;
+			subscriptionId = undefined;
+			return;
+		}
+
+		try {
+			const response = await fetch(`/api/user/subscription-status?channelId=${video.channelId}`);
+			if (response.ok) {
+				const data = await response.json();
+				isSubscribed = data.isSubscribed;
+				subscriptionId = data.subscriptionId;
+				console.log('Subscription status:', {
+					channelId: video.channelId,
+					isSubscribed,
+					subscriptionId
+				});
+			} else {
+				console.error('Failed to check subscription status:', response.status);
+				isSubscribed = false;
+				subscriptionId = undefined;
+			}
+		} catch (error) {
+			console.error('Error checking subscription status:', error);
+			isSubscribed = false;
+			subscriptionId = undefined;
+		}
+	} // Controlla lo stato dell'iscrizione quando il componente viene montato o quando cambia il canale
+	$effect(() => {
+		if (video?.channelId && $userStore) {
+			checkSubscription();
+		}
+	});
+
+	async function handleSubscription() {
+		if (!$userStore) return;
+
+		isLoading = true;
+		try {
+			if (isSubscribed) {
+				// Unsubscribe
+				if (subscriptionId) {
+					const response = await fetch('/api/user/unsubscribe', {
+						method: 'POST',
+						headers: { 'Content-Type': 'application/json' },
+						body: JSON.stringify({ subscriptionId })
+					});
+					if (response.ok) {
+						isSubscribed = false;
+						subscriptionId = undefined;
+					} else {
+						console.error('Failed to unsubscribe:', await response.text());
+					}
+				}
+			} else {
+				// Subscribe
+				const response = await fetch('/api/user/subscribe', {
+					method: 'POST',
+					headers: { 'Content-Type': 'application/json' },
+					body: JSON.stringify({ channelId: video.channelId })
+				});
+				if (response.ok) {
+					const data = await response.json();
+					isSubscribed = true;
+					subscriptionId = data.subscriptionId;
+				} else {
+					console.error('Failed to subscribe:', await response.text());
+				}
+			}
+		} catch (error) {
+			console.error('Error toggling subscription:', error);
+		} finally {
+			isLoading = false;
+		}
 	}
 </script>
 
@@ -43,15 +127,33 @@
 					alt="Channel Avatar"
 				/>
 				<div class="flex flex-col">
-					<h2 class="font-bold">{video.channelTitle}</h2>
+					<a
+						href={`/channel/${video.channelId}`}
+						class="text-primary font-semibold hover:underline"
+					>
+						<h2 class="font-bold">{video.channelTitle}</h2>
+					</a>
 					<p class="text-secondary font-light">
-						{formatSubscriberCount('1233456789')} di iscritti
+						{formatSubscriberCount('1234567')} di iscritti
 					</p>
 				</div>
-				<button
-					class="bg-background-secondary ml-2 h-fit cursor-pointer rounded-3xl px-4 py-2 align-middle font-semibold text-white"
-					>Iscriviti</button
-				>
+				{#if $userStore}
+					<button
+						class="text-background ml-2 h-fit cursor-pointer rounded-3xl px-4 py-2 align-middle font-semibold {isSubscribed
+							? 'bg-background-secondary text-primary'
+							: 'bg-primary'}"
+						onclick={handleSubscription}
+					>
+						{isSubscribed ? 'Iscritto' : 'Iscriviti'}
+					</button>
+				{:else}
+					<button
+						class="bg-background-secondary rounded-full px-4 py-2 font-bold text-white"
+						onclick={() => (window.location.href = '/api/auth/login')}
+					>
+						Subscribe
+					</button>
+				{/if}
 			</div>
 
 			<div class="mr-10 flex h-12">

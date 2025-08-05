@@ -3,13 +3,13 @@
 	import CommentsCard from '$lib/components/CommentsCard.svelte';
 	import RecommendedVideos from '$lib/components/RecommendedVideos.svelte';
 	import { fly } from 'svelte/transition';
-	import SkeletonHome from '$lib/components/SkeletonHome.svelte';
 	import SkeletonRecommended from '$lib/components/SkeletonRecommended.svelte';
 	import SkeletonPlayer from '$lib/components/SkeletonPlayer.svelte';
 	import type { Video } from '$lib/api/mock.js';
 	import { inview } from 'svelte-inview';
 
 	let { data } = $props();
+	$inspect(data);
 	let videos = $state<Video[]>([]);
 	let nextPageToken: string | undefined = $state(undefined);
 	let isLoaded = $state(false);
@@ -51,9 +51,6 @@
 				// Handle token error silently
 			});
 	});
-
-	const refactor = $state(false);
-	//TODO: refactor to have comment below video and related videos on the right side
 </script>
 
 <main class="w-full p-4 xl:p-8">
