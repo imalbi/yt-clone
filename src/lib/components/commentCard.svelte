@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { page } from '$app/state';
 	import { formatTimeAgo } from '$lib/scripts/scripts';
-	import { comments as commentsStore, commentStoreData } from '$lib/stores/commentsStore';
+	import { comments as commentsStore } from '$lib/stores/commentsStore';
 	import { userStore } from '$lib/stores/userStore';
 
 	let { commentData, threadId } = $props();
@@ -29,26 +29,55 @@
 			.replace(/javascript:/gi, '') // Rimuovi javascript:
 			.replace(/on\w+\s*=/gi, ''); // Rimuovi event handlers
 	}
+
+	// Handle comment edit
+	function handleEdit() {
+		if (editText.trim() === '') return;
+		commentsStore.editComment(page.params.videoId, threadId, editText);
+		editMode = false;
+	}
 </script>
 
-{#key threadId}
-	<div class="flex gap-3">
-		<img
-			class="size-10 rounded-full"
-			onerror={handleImageError}
-			src={commentData.authorProfileImageUrl}
-			alt="ImgAvatar of {commentData.authorDisplayName}"
-		/>
-		<div class="min-w-0">
-			<p class="text-sm">
-				<strong class="font-semibold">{commentData.authorDisplayName}</strong>
-				<span class="ml-2 text-gray-500">{formatTimeAgo(commentData.publishedAt)}</span>
-			</p>
+<div class="flex gap-3">
+	<img
+		class="size-10 rounded-full"
+		onerror={handleImageError}
+		src={commentData.authorProfileImageUrl}
+		alt="ImgAvatar of {commentData.authorDisplayName}"
+	/>
+	<div class="min-w-0">
+		<p class="text-sm">
+			<strong class="font-semibold">{commentData.authorDisplayName}</strong>
+			<span class="ml-2 text-gray-500">{formatTimeAgo(commentData.publishedAt)}</span>
+		</p>
 
+		{#if !editMode}
 			<div class="comment-content mt-1 text-sm break-words whitespace-pre-line">
 				{@html decodeAndSanitizeHtml(commentData.textDisplay)}
 			</div>
+		{:else}
+			<textarea
+				class="mt-2 w-full rounded border p-2"
+				bind:value={editText}
+				placeholder="Modifica il tuo commento"
+			></textarea>
+			<div class="mt-2 flex gap-2">
+				<button
+					class="text-primary hover:text-background cursor-pointer rounded-full px-3 py-1.5 text-sm font-medium transition-colors hover:bg-green-400"
+					onclick={handleEdit}
+				>
+					Save
+				</button>
+				<button
+					class="text-primary hover:text-background cursor-pointer rounded-full px-3 py-1.5 text-sm font-medium transition-colors hover:bg-gray-400"
+					onclick={() => (editMode = false)}
+				>
+					Cancel
+				</button>
+			</div>
+		{/if}
 
+		{#if !editMode}
 			<div class="mt-2 flex items-center gap-1">
 				<button
 					class="text-primary hover:bg-background-tertiary flex cursor-pointer items-center gap-1.5 rounded-full py-1 pr-2 pl-1 text-sm font-medium transition-colors"
@@ -87,51 +116,30 @@
 				</button>
 
 				<button
-					class=" hover:bg-background-tertiary text-primary ml-2 cursor-pointer rounded-full px-3 py-1.5 text-sm font-medium transition-colors"
+					class="hover:bg-background-tertiary text-primary ml-2 cursor-pointer rounded-full px-3 py-1.5 text-sm font-medium transition-colors"
 				>
 					Rispondi
 				</button>
-				<!-- Aggiungi un pulsante per eliminare il commento -->
+
+				<!-- User actions for own comments -->
 				{#if userStore && commentData.authorDisplayName === $userStore?.name}
 					<button
-						class=" text-primary hover:text-background ml-2 cursor-pointer rounded-full px-3 py-1.5 text-sm font-medium transition-colors hover:bg-red-400"
+						class="text-primary hover:text-background ml-2 cursor-pointer rounded-full px-3 py-1.5 text-sm font-medium transition-colors hover:bg-red-400"
 						onclick={() => commentsStore.removeComment(page.params.videoId, threadId)}
 					>
 						Delete
 					</button>
-					<!-- TODO: Implement edit functionality and Delete reactivity -->
 					<button
-						class=" text-primary hover:text-background ml-2 cursor-pointer rounded-full px-3 py-1.5 text-sm font-medium transition-colors hover:bg-blue-400"
+						class="text-primary hover:text-background ml-2 cursor-pointer rounded-full px-3 py-1.5 text-sm font-medium transition-colors hover:bg-blue-400"
 						onclick={() => {
-							editMode = !editMode;
-							if (editMode) {
-								editText = commentData.textDisplay; // Pre-fill the textarea with the current comment text
-							}
+							editMode = true;
+							editText = commentData.textDisplay; // Pre-fill with current text
 						}}
 					>
 						Edit
 					</button>
-					{#if editMode}
-						<textarea
-							class="mt-2 w-full rounded border p-2"
-							bind:value={editText}
-							placeholder="Modifica il tuo commento"
-						></textarea>
-						<button
-							class="text-primary hover:text-background ml-2 cursor-pointer rounded-full px-3 py-1.5 text-sm font-medium transition-colors hover:bg-green-400"
-							onclick={() => {
-								console.log($commentStoreData);
-								commentsStore.editComment(page.params.videoId, threadId, editText);
-								console.log($commentStoreData);
-								commentData.textDisplay = editText; // Update the displayed comment text
-								editMode = false;
-							}}
-						>
-							Save
-						</button>
-					{/if}
 				{/if}
 			</div>
-		</div>
+		{/if}
 	</div>
-{/key}
+</div>

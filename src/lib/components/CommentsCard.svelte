@@ -5,10 +5,11 @@
 	import type { Video } from '$lib/api/mock';
 	import { inview } from 'svelte-inview';
 	import { page } from '$app/state';
-	import { comments as commentsStore, commentStoreData } from '$lib/stores/commentsStore';
-
+	import { comments as commentsStore } from '$lib/stores/commentsStore';
 	import { userStore } from '$lib/stores/userStore';
 	import { afterNavigate } from '$app/navigation';
+	import { onDestroy } from 'svelte';
+
 	let {
 		comments,
 		video,
@@ -19,19 +20,31 @@
 		commentsNextPageToken: Promise<string | undefined>;
 	} = $props();
 
-	let allComments = $derived<CommentThread[]>($commentStoreData[page.params.videoId] || []); // Inizializza con i commenti mock
+	// Subscribe to the store for this video ID
+	let allComments = $state<CommentThread[]>([]);
 	let nextPageToken = $state<string | undefined>(undefined);
 	let isLoaded = $state(false);
 	let newComment = $state('');
 	let show = $state(false);
 
-	// Combina entrambe le Promise per un loading unificato
-	const dataPromise = Promise.all([comments, video]);
+	// Create a store subscription that updates allComments when the store changes
+	const unsubscribe = commentsStore.subscribe((store) => {
+		if (page.params.videoId) {
+			const storeComments = store[page.params.videoId] || [];
+			allComments = storeComments; // aggiorna SEMPRE
+		}
+	});
 
-	//Funzione per gestire aggiunta di un nuovo commento
+	// Cleanup the subscription when the component is destroyed
+	onDestroy(unsubscribe);
+
+	// Combine promises for loading
+	//const dataPromise = Promise.all([comments, video]);
+
+	// Add a new comment
 	async function addComment() {
 		if (newComment.trim() === '') return;
-		if (!userStore) {
+		if (!$userStore) {
 			alert('Devi essere loggato per aggiungere un commento.');
 			return;
 		}
@@ -42,8 +55,8 @@
 				id: crypto.randomUUID(),
 				textDisplay: newComment,
 				publishedAt: new Date().toISOString(),
-				authorChannelId: '', // Non necessario per il mock
-				authorChannelUrl: '', // Non necessario per il mock
+				authorChannelId: '',
+				authorChannelUrl: '',
 				authorDisplayName: $userStore?.name || 'Tu',
 				authorProfileImageUrl: $userStore?.picture || '',
 				likeCount: 0
@@ -51,14 +64,14 @@
 			replies: []
 		};
 
-		allComments = [commentData, ...allComments];
+		// Add to store (will trigger subscription update)
+		commentsStore.addComment(page.params.videoId, commentData);
+
 		newComment = '';
 		show = false;
-
-		// Aggiungi il nuovo commento allo store
-		commentsStore.addComment(page.params.videoId, commentData);
 	}
 
+	// Load more comments
 	async function loadMoreComments() {
 		if (!nextPageToken) return;
 
@@ -68,51 +81,45 @@
 			);
 			const newCommentsData = await response.json();
 
-			// Filtra commenti duplicati
-			const existingIds = new Set(allComments.map((c) => c.id));
-			const newUniqueComments = newCommentsData.comments.filter(
-				(comment: CommentThread) => !existingIds.has(comment.id)
-			);
+			// Add the new comments to the store
+			commentsStore.addApiComments(page.params.videoId, newCommentsData.comments);
 
-			allComments = [...allComments, ...newUniqueComments];
 			nextPageToken = newCommentsData.nextPageToken;
 		} catch (error) {
 			console.error('Error loading more comments:', error);
 		}
 	}
 
+	// Initialize comments on navigation
 	afterNavigate(() => {
 		console.log('Navigated to a new video, resetting comments state');
-		// Resetta lo stato quando si naviga in una nuova pagina video
 		isLoaded = false;
-		allComments = [];
 		nextPageToken = undefined;
+		allComments = [];
 
-		// Ricarica i commenti per il nuovo video
-		allComments = commentsStore.getComments(page.params.videoId) || [];
-
-		Promise.all([comments, commentsNextPageToken])
-			.then(([initialComments, token]) => {
-				allComments.push(...initialComments);
+		(async () => {
+			try {
+				const [initialComments, token] = await Promise.all([comments, commentsNextPageToken]);
+				commentsStore.addApiComments(page.params.videoId, initialComments);
 				nextPageToken = token;
-				isLoaded = true;
-			})
-			.catch((error) => {
+			} catch (error) {
 				console.error('Error loading comments:', error);
+			} finally {
 				isLoaded = true;
-			});
+			}
+		})();
 	});
 </script>
 
 <div class="bg-background-secondary text-primary m-auto mt-10 flex flex-col gap-3 rounded-2xl p-4">
-	{#await dataPromise}
+	{#await comments}
 		<p class="text-secondary">Caricamento dei commenti ...</p>
-	{:then [resolvedComments, resolvedVideo]}
+	{:then}
 		<h1 class="text-primary mb-2 p-2 font-bold">
-			{resolvedVideo?.statistics?.commentCount || 0} commenti
+			{isLoaded ? allComments.length : 0} commenti
 		</h1>
 
-		<form class="">
+		<form>
 			<textarea
 				class="w-full"
 				onfocus={() => (show = true)}
@@ -146,7 +153,10 @@
 							class="bg-background-tertiary text-primary/60 rounded-2xl p-2"
 							tabindex="-1"
 							role="button"
-							onmousedown={(e) => (e.preventDefault(), e.stopPropagation())}
+							onmousedown={(e) => {
+								e.preventDefault();
+								e.stopPropagation();
+							}}
 						>
 							Commenta
 						</div>
@@ -154,9 +164,8 @@
 				</div>
 			{/if}
 		</form>
-
 		<!-- Mostra i commenti (prima quelli iniziali, poi quelli caricati dinamicamente) -->
-		{#each isLoaded ? allComments : [] as comment (comment.id)}
+		{#each allComments as comment (comment.id)}
 			<CommentCard commentData={comment.topLevelComment} threadId={comment.id}></CommentCard>
 			{#if comment.replies && comment.replies.length > 0}
 				<div class="ml-4">

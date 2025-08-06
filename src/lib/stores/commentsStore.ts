@@ -1,40 +1,34 @@
-// src/lib/stores/commentsStore.js
+import { writable } from 'svelte/store';
+import type { CommentThread } from '$lib/types/commentThread';
 
-import { writable, get } from 'svelte/store';
-import { browser } from '$app/environment';
-import type { Comment, CommentThread } from '$lib/types/commentThread';
-import { subscribe } from 'diagnostics_channel';
+let STORAGE_KEY = 'youtube_comments';
 
-// Chiave per il localStorage dove verranno salvati i commenti dei video.
-const STORAGE_KEY = 'video-comments';
-
-export const commentStoreData = writable<{ [videoId: string]: CommentThread[] }>({});
-
-/**
- * Store per gestire i commenti dei video.
- * Lo store si sincronizza automaticamente con il localStorage del browser.
- */
+// Create a store for comments data
 function createCommentsStore() {
-	const initialData = browser ? JSON.parse(localStorage.getItem(STORAGE_KEY) || '{}') : {};
-	console.log('[commentsStore] Initial data from localStorage:', initialData);
-	commentStoreData.set(initialData);
-	console.log('[commentsStore] Store initialized with:', initialData);
-	if (browser) {
-		commentStoreData.subscribe((currentValue) => {
-			localStorage.setItem(STORAGE_KEY, JSON.stringify(currentValue));
-		});
-	}
+	// Initialize from localStorage if available
+	const storedData =
+		typeof localStorage !== 'undefined'
+			? JSON.parse(localStorage.getItem(STORAGE_KEY) || '{}')
+			: {};
+
+	const { subscribe, update } = writable<Record<string, CommentThread[]>>(storedData);
 
 	return {
-		subscribe: commentStoreData.subscribe,
+		subscribe,
 
+		// Add comments from API
 		addApiComments: (videoId: string, apiComments: CommentThread[]) => {
-			commentStoreData.update((store) => {
+			console.log(
+				`[commentsStore] Adding ${apiComments.length} API comments to videoId=${videoId}`
+			);
+			update((store) => {
 				// Get existing comments for this video
 				const existingComments = store[videoId] || [];
+
+				// Creo un set di id già presenti
 				const existingIds = new Set(existingComments.map((c) => c.id));
 
-				// Filter out comments that already exist in the store
+				// Tengo solo i commenti il quale id non è già presente
 				const newComments = apiComments.filter((c) => !existingIds.has(c.id));
 
 				// Merge API comments with existing ones
@@ -45,86 +39,91 @@ function createCommentsStore() {
 
 				// Save to localStorage
 				if (typeof localStorage !== 'undefined') {
-					localStorage.setItem('youtube_comments', JSON.stringify(newStore));
+					localStorage.setItem(STORAGE_KEY, JSON.stringify(newStore));
 				}
 
 				return newStore;
 			});
 		},
 
-		/**
-		 * Aggiunge un nuovo commento a un video specifico.
-		 * @param {string} videoId - L'ID del video.
-		 * @param {Comment} newComment - Il nuovo commento da aggiungere.
-		 */
-		addComment: (videoId: string, newComment: CommentThread) => {
-			commentStoreData.update((allComments) => {
-				// Recupera i commenti esistenti per questo video o crea un array vuoto.
-				const videoComments = allComments[videoId] || [];
-				console.log(`[commentsStore] Adding comment to videoId=`, videoId, 'comment:', newComment);
-				console.log(commentStoreData);
-				console.log('All comments before update:', allComments);
-				return {
-					...allComments,
-					[videoId]: [...videoComments, newComment]
-				};
+		// Add a new user comment
+		addComment: (videoId: string, comment: CommentThread) => {
+			console.log(`[commentsStore] Adding new comment to videoId=${videoId}`, comment);
+			update((store) => {
+				const videoComments = store[videoId] || [];
+				const updatedComments = [comment, ...videoComments];
+
+				const newStore = { ...store, [videoId]: updatedComments };
+
+				// Save to localStorage
+				if (typeof localStorage !== 'undefined') {
+					localStorage.setItem(STORAGE_KEY, JSON.stringify(newStore));
+				}
+
+				return newStore;
 			});
 		},
-		/**
-		 * Recupera i commenti per un video specifico.
-		 * @param {string} videoId - L'ID del video.
-		 * @returns {CommentThread[]} - Un array di commenti per il video.
-		 * */
+
+		// Edit an existing comment
+		editComment: (videoId: string, threadId: string, updatedText: string) => {
+			console.log(`[commentsStore] Editing comment threadId=${threadId} in videoId=${videoId}`);
+			update((store) => {
+				const videoComments = store[videoId] || [];
+				// Find and update the comment with the given threadId
+				const updatedComments = videoComments.map((thread) => {
+					if (thread.id === threadId) {
+						return {
+							...thread,
+							topLevelComment: {
+								...thread.topLevelComment,
+								textDisplay: updatedText
+							}
+						};
+					}
+					return thread;
+				});
+
+				const newStore = { ...store, [videoId]: updatedComments };
+
+				// Save to localStorage
+				if (typeof localStorage !== 'undefined') {
+					localStorage.setItem(STORAGE_KEY, JSON.stringify(newStore));
+				}
+
+				return newStore;
+			});
+		},
+
+		// Remove a comment
+		removeComment: (videoId: string, threadId: string) => {
+			console.log(`[commentsStore] Removing comment threadId=${threadId} from videoId=${videoId}`);
+			update((store) => {
+				const videoComments = store[videoId] || [];
+				// Filtro i commenti per rimuovere quello con l'id specificato
+				const updatedComments = videoComments.filter((thread) => thread.id !== threadId);
+
+				const newStore = { ...store, [videoId]: updatedComments };
+
+				// Save to localStorage
+				if (typeof localStorage !== 'undefined') {
+					localStorage.setItem(STORAGE_KEY, JSON.stringify(newStore));
+				}
+
+				return newStore;
+			});
+		},
+
+		// Get comments for a specific video
 		getComments: (videoId: string): CommentThread[] => {
-			const allComments = get(commentStoreData);
-			console.log(
-				`[commentsStore] Getting comments for videoId=`,
-				videoId,
-				'comments:',
-				allComments[videoId] || []
-			);
-			const videoComments = allComments[videoId] || [];
-			console.log(
-				`[commentsStore] Returning comments for videoId=`,
-				videoId,
-				'comments:',
-				videoComments
-			);
-			return videoComments;
-		},
-		/**
-		 * Modifica un commento specifico di un video.
-		 * @param {string} videoId - L'ID del video.
-		 * @param {string} commentId - L'ID del commento da modificare.
-		 * @param {string} newText - Il commento aggiornato.
-		 */
-		editComment: (videoId: string, commentId: string, newText: string) => {
-			const allComments = get(commentStoreData) || [];
-			const videoComments = allComments[videoId] || [];
-			const commentToEdit = videoComments.find((c: CommentThread) => c.id === commentId);
-			console.log(commentToEdit);
-			if (commentToEdit) {
-				commentToEdit.topLevelComment.textDisplay = newText;
-			}
-			commentStoreData.set({ ...allComments, [videoId]: videoComments });
-		},
+			let result: CommentThread[] = [];
+			subscribe((store) => {
+				result = store[videoId] || [];
+			})();
 
-		/**
-		 * Rimuove un commento specifico da un video.
-		 * @param {string} videoId - L'ID del video.
-		 * @param {string} commentId - L'ID del commento da rimuovere.
-		 */
-		removeComment: (videoId: string, commentId: string) => {
-			commentStoreData.update((allComments) => {
-				const videoComments = allComments[videoId] || [];
-				console.log(`[commentsStore] Removing commentId=`, commentId, 'from videoId=', videoId);
-				const updatedComments = videoComments.filter((c: CommentThread) => c.id !== commentId);
-
-				return {
-					...allComments,
-					[videoId]: updatedComments
-				};
-			});
+			console.log(
+				`[commentsStore] Getting comments for videoId=${videoId}, found ${result.length} comments`
+			);
+			return result;
 		}
 	};
 }
