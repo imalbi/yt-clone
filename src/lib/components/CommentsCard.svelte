@@ -2,14 +2,12 @@
 	import CommentCard from './commentCard.svelte';
 	import type { CommentThread } from '$lib/types/commentThread';
 	import CommentReply from '$lib/components/CommentReply.svelte';
-	import type { Video } from '$lib/api/mock';
 	import { inview } from 'svelte-inview';
 	import { page } from '$app/state';
 	import { comments as commentsStore } from '$lib/stores/commentsStore';
 	import { userStore } from '$lib/stores/userStore';
 	import { afterNavigate } from '$app/navigation';
 	import { onDestroy } from 'svelte';
-
 	let {
 		comments,
 		commentsNextPageToken
