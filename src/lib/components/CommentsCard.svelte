@@ -5,7 +5,10 @@
 	import type { Video } from '$lib/api/mock';
 	import { inview } from 'svelte-inview';
 	import { page } from '$app/state';
+	import { comments as commentsStore, commentStoreData } from '$lib/stores/commentsStore';
 
+	import { userStore } from '$lib/stores/userStore';
+	import { afterNavigate } from '$app/navigation';
 	let {
 		comments,
 		video,
@@ -16,7 +19,7 @@
 		commentsNextPageToken: Promise<string | undefined>;
 	} = $props();
 
-	let allComments = $state<CommentThread[]>([]);
+	let allComments = $derived<CommentThread[]>($commentStoreData[page.params.videoId] || []); // Inizializza con i commenti mock
 	let nextPageToken = $state<string | undefined>(undefined);
 	let isLoaded = $state(false);
 	let newComment = $state('');
@@ -24,6 +27,37 @@
 
 	// Combina entrambe le Promise per un loading unificato
 	const dataPromise = Promise.all([comments, video]);
+
+	//Funzione per gestire aggiunta di un nuovo commento
+	async function addComment() {
+		if (newComment.trim() === '') return;
+		if (!userStore) {
+			alert('Devi essere loggato per aggiungere un commento.');
+			return;
+		}
+
+		const commentData: CommentThread = {
+			id: crypto.randomUUID(),
+			topLevelComment: {
+				id: crypto.randomUUID(),
+				textDisplay: newComment,
+				publishedAt: new Date().toISOString(),
+				authorChannelId: '', // Non necessario per il mock
+				authorChannelUrl: '', // Non necessario per il mock
+				authorDisplayName: $userStore?.name || 'Tu',
+				authorProfileImageUrl: $userStore?.picture || '',
+				likeCount: 0
+			},
+			replies: []
+		};
+
+		allComments = [commentData, ...allComments];
+		newComment = '';
+		show = false;
+
+		// Aggiungi il nuovo commento allo store
+		commentsStore.addComment(page.params.videoId, commentData);
+	}
 
 	async function loadMoreComments() {
 		if (!nextPageToken) return;
@@ -47,16 +81,19 @@
 		}
 	}
 
-	// Inizializza i commenti quando le Promise si risolvono o quando cambia il video
-	$effect(() => {
-		// Reset state quando cambia il video
+	afterNavigate(() => {
+		console.log('Navigated to a new video, resetting comments state');
+		// Resetta lo stato quando si naviga in una nuova pagina video
 		isLoaded = false;
 		allComments = [];
 		nextPageToken = undefined;
 
+		// Ricarica i commenti per il nuovo video
+		allComments = commentsStore.getComments(page.params.videoId) || [];
+
 		Promise.all([comments, commentsNextPageToken])
 			.then(([initialComments, token]) => {
-				allComments = initialComments;
+				allComments.push(...initialComments);
 				nextPageToken = token;
 				isLoaded = true;
 			})
@@ -80,7 +117,7 @@
 				class="w-full"
 				onfocus={() => (show = true)}
 				bind:value={newComment}
-				placeholder="Aggiungi un commento (PlaceHolder)"
+				placeholder="Aggiungi un commento (LocalStorage)"
 			></textarea>
 			{#if show}
 				<div class="mr-4 flex justify-end gap-3">
@@ -97,6 +134,10 @@
 						<button
 							class="text-primary cursor-pointer rounded-2xl bg-blue-500 p-2 font-bold"
 							type="submit"
+							onclick={(e) => {
+								e.preventDefault();
+								addComment();
+							}}
 						>
 							Commenta
 						</button>
@@ -115,8 +156,8 @@
 		</form>
 
 		<!-- Mostra i commenti (prima quelli iniziali, poi quelli caricati dinamicamente) -->
-		{#each isLoaded ? allComments : resolvedComments as comment (comment.id)}
-			<CommentCard commentData={comment.topLevelComment}></CommentCard>
+		{#each isLoaded ? allComments : [] as comment (comment.id)}
+			<CommentCard commentData={comment.topLevelComment} threadId={comment.id}></CommentCard>
 			{#if comment.replies && comment.replies.length > 0}
 				<div class="ml-4">
 					<p class="text-secondary">Risposte:</p>
