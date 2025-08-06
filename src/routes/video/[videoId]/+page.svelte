@@ -103,10 +103,7 @@
 		</div>
 
 		<div class="w-full xl:col-start-1 xl:row-start-2 xl:min-h-0">
-			<CommentsCard
-				comments={data.comments}
-				video={data.video}
-				commentsNextPageToken={data.commentsNextPageToken}
+			<CommentsCard comments={data.comments} commentsNextPageToken={data.commentsNextPageToken}
 			></CommentsCard>
 		</div>
 	</div>

@@ -12,11 +12,9 @@
 
 	let {
 		comments,
-		video,
 		commentsNextPageToken
 	}: {
 		comments: Promise<CommentThread[]>;
-		video: Promise<Video | null>;
 		commentsNextPageToken: Promise<string | undefined>;
 	} = $props();
 
@@ -82,9 +80,12 @@
 			const newCommentsData = await response.json();
 
 			// Add the new comments to the store
-			commentsStore.addApiComments(page.params.videoId, newCommentsData.comments);
+			const added = commentsStore.addApiComments(page.params.videoId, newCommentsData.comments);
 
 			nextPageToken = newCommentsData.nextPageToken;
+			if (added === 0) {
+				loadMoreComments();
+			} // If no new comments, try loading more
 		} catch (error) {
 			console.error('Error loading more comments:', error);
 		}

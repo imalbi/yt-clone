@@ -21,6 +21,7 @@ function createCommentsStore() {
 			console.log(
 				`[commentsStore] Adding ${apiComments.length} API comments to videoId=${videoId}`
 			);
+			let addedCount = 0;
 			update((store) => {
 				// Get existing comments for this video
 				const existingComments = store[videoId] || [];
@@ -30,7 +31,7 @@ function createCommentsStore() {
 
 				// Tengo solo i commenti il quale id non è già presente
 				const newComments = apiComments.filter((c) => !existingIds.has(c.id));
-
+				addedCount = newComments.length;
 				// Merge API comments with existing ones
 				const updatedComments = [...existingComments, ...newComments];
 
@@ -44,6 +45,7 @@ function createCommentsStore() {
 
 				return newStore;
 			});
+			return addedCount;
 		},
 
 		// Add a new user comment
