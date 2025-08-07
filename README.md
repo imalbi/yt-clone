@@ -19,6 +19,8 @@ Un clone funzionale e moderno dell'interfaccia di YouTube, costruito con SvelteK
 
 ---
 
+## Outdated, new features
+
 ## 🚀 Caratteristiche Principali
 
 ### Funzionalità Base
