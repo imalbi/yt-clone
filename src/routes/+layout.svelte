@@ -36,7 +36,7 @@
 
 <TopBar onToggle={handleToggleMenu} {inputSearch} />
 <div class="flex flex-row pt-18">
-	{#if page.url.pathname.startsWith('/video/')}
+	{#if page.url.pathname.startsWith('/video/') || page.url.pathname.startsWith('/playlist/watch')}
 		<!-- No sidebar for video pages -->
 		{@render children()}
 	{:else if isMobile}

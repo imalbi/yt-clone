@@ -598,7 +598,8 @@ export async function getLikedVideos(accessToken: string): Promise<{ videos: Vid
 			videos: data.items.map((item: any) => {
 				return {
 					id: item.contentDetails.videoId,
-					channelId: item.snippet.channelId,
+					channelId: item.snippet.videoOwnerChannelId,
+					channelTitle: item.snippet.videoOwnerChannelTitle,
 					title: item.snippet.title,
 					thumbnail: item.snippet.thumbnails.default.url
 				};
