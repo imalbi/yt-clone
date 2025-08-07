@@ -568,3 +568,44 @@ export async function rateVideo(
 		throw error;
 	}
 }
+
+//https://www.googleapis.com/youtube/v3/channels?part=contentDetails&mine=true&key={YOUR_API_KEY}
+
+//https://www.googleapis.com/youtube/v3/playlistItems?part=contentDetails,snippet&playlistId=LL&key={YOUR_API_KEY}
+export async function getLikedVideos(accessToken: string): Promise<{ videos: Video[] }> {
+	if (!accessToken) {
+		throw new Error('Access token is required');
+	}
+	try {
+		const response = await fetch(
+			`https://www.googleapis.com/youtube/v3/playlistItems?part=contentDetails,snippet&maxResults=20&playlistId=LL&key={YOUR_API_KEY}`,
+			{
+				headers: {
+					Authorization: `Bearer ${accessToken}`
+				}
+			}
+		);
+
+		if (!response.ok) {
+			const errorText = await response.text();
+			console.error('Failed to fetch liked videos', response.status, errorText);
+			throw new Error(`Failed to fetch liked videos: ${response.status}`);
+		}
+
+		const data = await response.json();
+
+		return {
+			videos: data.items.map((item: any) => {
+				return {
+					id: item.contentDetails.videoId,
+					channelId: item.snippet.channelId,
+					title: item.snippet.title,
+					thumbnail: item.snippet.thumbnails.default.url
+				};
+			})
+		};
+	} catch (error) {
+		console.error(error);
+		throw error;
+	}
+}

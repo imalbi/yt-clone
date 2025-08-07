@@ -1,4 +1,4 @@
-export interface Video {
+export type Video = {
 	id: string;
 	publishedAt: string;
 	channelId: string;
@@ -19,7 +19,7 @@ export interface Video {
 		commentCount?: string;
 	};
 	avatarUrl: string;
-}
+};
 
 export interface PlayerResponse {
 	//TODO: Implement mock player response;
