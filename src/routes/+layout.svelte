@@ -6,6 +6,8 @@
 	import { page } from '$app/state';
 	import { onMount } from 'svelte';
 	import { userStore } from '$lib/stores/userStore';
+	import { likedVideosStore } from '$lib/stores/likedVideosStore';
+	import { browser } from '$app/environment';
 
 	let { data, children } = $props();
 	let isMenuOpen = $state(false);
@@ -20,6 +22,19 @@
 	$effect(() => {
 		// Aggiorna lo stato dell'input di ricerca quando cambia il percorso della pagina
 		$userStore = data.user;
+
+		// Initialize liked videos store when user data is available
+		if ($userStore && browser) {
+			// Get access token from cookies
+			const accessToken = document.cookie
+				.split('; ')
+				.find((row) => row.startsWith('access_token='))
+				?.split('=')[1];
+
+			if (accessToken) {
+				likedVideosStore.initFromApi(accessToken);
+			}
+		}
 	});
 
 	onMount(() => {

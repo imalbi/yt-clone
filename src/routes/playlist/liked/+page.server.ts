@@ -1,16 +1,12 @@
-import * as apis from '$lib/api/youtube';
+import { redirect } from '@sveltejs/kit';
 
 export async function load({ cookies }) {
-	try {
-		const videosInfos = apis.getLikedVideos(cookies.get('access_token') || '');
-		return {
-			videos: videosInfos.then((data) => data.videos),
-			error: null
-		};
-	} catch (error) {
-		return {
-			videos: Promise.resolve([]),
-			error: error instanceof Error ? error.message : 'Errore sconosciuto'
-		};
+	const accessToken = cookies.get('access_token');
+
+	if (!accessToken) {
+		throw redirect(302, '/api/auth/login');
 	}
+
+	// No need to fetch videos here anymore, the store handles it
+	return { accessToken };
 }

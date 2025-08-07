@@ -1,18 +1,19 @@
 import { writable } from 'svelte/store';
+import { browser } from '$app/environment';
 
 const STORAGE_KEY = 'likedVideos';
 
 function createLikedVideosStore() {
-	const { subscribe, update } = writable<string[]>([]);
+	const { subscribe, update, set } = writable<string[]>([]);
 
 	// Load initial state from localStorage
-	if (typeof localStorage !== 'undefined') {
+	if (browser && typeof localStorage !== 'undefined') {
 		const storedData = localStorage.getItem(STORAGE_KEY);
 		if (storedData) {
 			try {
 				const parsedData = JSON.parse(storedData);
 				if (Array.isArray(parsedData)) {
-					update(() => parsedData);
+					set(parsedData);
 				}
 			} catch (error) {
 				console.error('Failed to parse liked videos from localStorage:', error);
@@ -25,6 +26,28 @@ function createLikedVideosStore() {
 	// 1. Add from API nVideos (20) if already in store, skip. if not, add to the end, if store contains videoId not in API, remove it
 	return {
 		subscribe,
+		async initFromApi(accessToken?: string) {
+			if (!accessToken || !browser) return;
+			let res;
+
+			try {
+				console.log('[likedVideosStore] Fetching liked videos from API');
+				const response = await fetch('/api/user/liked-videos', {
+					headers: {
+						Authorization: `Bearer ${accessToken}`
+					}
+				});
+
+				if (response.ok) {
+					const data = await response.json();
+					const videoIds = data.videos.map((video: any) => video.id);
+					this.addFromApi(videoIds);
+				}
+			} catch (error) {
+				console.error('Failed to fetch liked videos from API:', error);
+			}
+			return res;
+		},
 		addFromApi: (videoIds: string[]) => {
 			console.log(`[likedVideosStore] Adding ${videoIds.length} liked videos from API`);
 			update((store) => {

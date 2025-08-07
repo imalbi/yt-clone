@@ -6,6 +6,7 @@
 	import { likedVideosStore } from '$lib/stores/likedVideosStore';
 	import { goto } from '$app/navigation';
 	import { page } from '$app/state';
+	import { onMount } from 'svelte';
 
 	let { data } = $props();
 	let isLoaded = $state(false);
@@ -23,6 +24,18 @@
 	// Check if there are previous/next videos
 	let hasPrevious = $derived(currentIndex > 0);
 	let hasNext = $derived(currentIndex < likedVideosIds.length - 1);
+
+	onMount(() => {
+		likedVideosStore.initFromApi(data.accessToken);
+		if (page.params.videoId) {
+			// Ensure the current video ID is valid
+			if (!likedVideosIds.includes(currentVideoId)) {
+				goto('/playlist/liked');
+			}
+		} else {
+			goto('/playlist/liked');
+		}
+	});
 
 	// Navigation functions
 	function goToPrevious() {
@@ -97,7 +110,9 @@
 					</button>
 				</div>
 
-				<div class="text-primary text-sm font-medium">Playlist: Liked Videos</div>
+				<a href="/playlist/liked">
+					<div class="text-primary text-sm font-medium">Playlist: Liked Videos</div>
+				</a>
 			</div>
 		</div>
 
