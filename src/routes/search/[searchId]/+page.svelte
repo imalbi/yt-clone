@@ -1,76 +1,61 @@
 <script lang="ts">
-	import SearchVideoCard from '$lib/components/searchVideoCard.svelte';
-	import { page } from '$app/state';
+	import { createInfiniteQuery } from '@tanstack/svelte-query';
+	import ChannelResultCard from '#lib/components/ChannelResultCard.svelte';
+	import SearchFilterBar from '#lib/components/SearchFilterBar.svelte';
+	import SearchVideoCard from '#lib/components/searchVideoCard.svelte';
+	import SkeletonSearch from '#lib/components/SkeletonSearch.svelte';
 	import { inview } from 'svelte-inview';
-	import SkeletonSearch from '$lib/components/SkeletonSearch.svelte';
-	import type { Video } from '$lib/api/mock';
+	import { searchOptions } from '#lib/queries.js';
 
 	let { data } = $props();
 
-	let videos = $state<Video[]>([]);
-	let nextPageToken: string | undefined = $state(undefined);
-	let isLoaded = $state(false);
-	let error = $state<string | null>(null);
+	// I filtri fanno parte della chiave: cambiandoli la lista riparte, e la
+	// combinazione precedente resta in cache per il tasto indietro.
+	const results = createInfiniteQuery(() =>
+		searchOptions(data.query, data.filters, data.firstPage)
+	);
 
-	async function loadMoreVideos() {
-		if (!nextPageToken) return;
-
-		try {
-			const response = await fetch(
-				`/api/videos/search?q=${page.params.searchId}&pageToken=${nextPageToken}`
-			);
-			const newVideosData = await response.json();
-
-			// Filtra i video duplicati basandosi sull'ID
-			const existingIds = new Set(videos.map((v) => v.id));
-			const newUniqueVideos = newVideosData.videos.filter(
-				(video: Video) => !existingIds.has(video.id)
-			);
-
-			videos = [...videos, ...newUniqueVideos];
-			nextPageToken = newVideosData.nextPageToken;
-		} catch (error) {
-			console.error('Error loading more videos:', error);
-		}
+	// La deduplica per id, che prima era a mano a ogni pagina, serve ancora:
+	// l'API di ricerca puo' restituire lo stesso video su pagine diverse.
+	function dedupe<T extends { id: string }>(items: T[]): T[] {
+		// Temporaneo locale di un calcolo puro, non stato reattivo: SvelteSet sarebbe overhead.
+		// eslint-disable-next-line svelte/prefer-svelte-reactivity
+		const seen = new Set<string>();
+		return items.filter((item) => (seen.has(item.id) ? false : (seen.add(item.id), true)));
 	}
 
-	$effect(() => {
-		data.searchResults
-			.then((awaitedVideos) => {
-				if (!isLoaded) {
-					videos = awaitedVideos;
-					isLoaded = true;
-				}
-			})
-			.catch((err) => {
-				error = err?.message || err;
-				isLoaded = true;
-			});
-		data.nextPageToken.then((token) => {
-			nextPageToken = token;
-		});
-	});
+	const pages = $derived(results.data?.pages ?? []);
+	const videos = $derived(dedupe(pages.flatMap((p) => p.videos)));
+	const channels = $derived(dedupe(pages.flatMap((p) => p.channels)));
+	const isEmpty = $derived(videos.length === 0 && channels.length === 0);
 </script>
 
-<main class="mx-auto mt-3 flex w-full max-w-5xl flex-col gap-5 p-2 px-4">
-	{#if error}
+<main class="mx-auto mt-3 flex w-full max-w-5xl flex-col gap-5 p-2">
+	<SearchFilterBar filters={data.filters} />
+
+	{#if results.isError}
 		<p>
-			<strong class="text-primary">Errore nel caricamento dei video: {error}</strong>
+			<strong class="text-primary">
+				Errore nel caricamento dei risultati: {results.error.message}
+			</strong>
 		</p>
-	{:else if !isLoaded}
-		{#each Array(9)}
+	{:else if results.isPending}
+		{#each Array(9), i (i)}
 			<SkeletonSearch />
 		{/each}
-	{:else if videos.length > 0}
-		{#each videos as video (video.id)}
-			<SearchVideoCard {video}></SearchVideoCard>
+	{:else if isEmpty}
+		<p class="text-secondary">Nessun risultato per {data.query}</p>
+	{:else}
+		{#each channels as channel (channel.id)}
+			<ChannelResultCard {channel} />
 		{/each}
-		{#if nextPageToken}
-			<div use:inview={{ threshold: 0.1 }} oninview_enter={() => loadMoreVideos()}>
+		{#each videos as video (video.id)}
+			<SearchVideoCard {video} />
+		{/each}
+		{#if results.hasNextPage}
+			<div use:inview={{ threshold: 0.1 }} oninview_enter={() => results.fetchNextPage()}>
 				<SkeletonSearch />
 			</div>
 		{/if}
-	{:else}
-		<p>Nessun risultato per {page.params.searchId}</p>
 	{/if}
 </main>

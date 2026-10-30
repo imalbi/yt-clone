@@ -1,185 +1,107 @@
 <script lang="ts">
+	import { queryKeys } from '#lib/queries.js';
+	import { formatData, formatSubscriberCount } from '#lib/scripts/scripts.js';
+	import { subscriptionState } from '#lib/subscription.svelte.js';
+	import type { Video } from '#lib/types/video.js';
+	import type { User } from '#lib/types/user.js';
+	import { likeStatus, rateVideo } from '#lib/youtube.remote.js';
+	import { resolve } from '$app/paths';
+	import { useQueryClient } from '@tanstack/svelte-query';
+	import IconShareVariant from '~icons/mdi/share-variant';
+	import IconThumbDown from '~icons/mdi/thumb-down';
+	import IconThumbDownOutline from '~icons/mdi/thumb-down-outline';
+	import IconThumbUp from '~icons/mdi/thumb-up';
+	import IconThumbUpOutline from '~icons/mdi/thumb-up-outline';
+	import IconCheck from '~icons/mdi/check';
 	import DescriptionBox from './DescriptionBox.svelte';
-	import SkeletonPlayer from './SkeletonPlayer.svelte';
-	import { formatSubscriberCount, formatData } from '$lib/scripts/scripts';
-	import { userStore } from '$lib/stores/userStore';
-	import { goto } from '$app/navigation';
-	let { video } = $props();
 
-	let isSubscribed = $state(false);
-	let subscriptionId = $state<string | undefined>(undefined);
-	let isLoading = $state(false);
-	let isLoadingLike = $state(false);
-	let videoLiked = $state<boolean | null>();
+	// `video` e' null finche' il `load` non risolve, e null se il video non esiste.
+	let { video, user }: { video: Video | null; user: User } = $props();
 
-	// Controlla se l'utente ha messo like o dislike al video
-	async function checkLike() {
-		try {
-			const response = await fetch(`/api/user/like-status?videoId=${video.id}`);
-			if (response.ok) {
-				const data = await response.json();
-				videoLiked = data.videoLiked;
-			} else {
-				videoLiked = null;
-			}
-		} catch (error) {
-			videoLiked = null;
-		}
-	}
+	let copied = $state(false);
 
-	// Controlla se l'utente è iscritto a questo canale
-	async function checkSubscription() {
-		try {
-			const response = await fetch(`/api/user/subscription-status?channelId=${video.channelId}`);
-			if (response.ok) {
-				const data = await response.json();
-				isSubscribed = data.isSubscribed;
-				subscriptionId = data.subscriptionId;
-				console.log('Subscription status:', {
-					channelId: video.channelId,
-					isSubscribed,
-					subscriptionId
+	async function handleShare() {
+		if (typeof window === 'undefined') return;
+		const shareUrl = window.location.href;
+		if (navigator.share) {
+			try {
+				await navigator.share({
+					title: video?.title ?? 'Video',
+					url: shareUrl
 				});
-			} else {
-				console.error('Failed to check subscription status:', response.status);
-				isSubscribed = false;
-				subscriptionId = undefined;
+				return;
+			} catch {
+				// User cancelled or share failed, fallback to clipboard
 			}
-		} catch (error) {
-			console.error('Error checking subscription status:', error);
-			isSubscribed = false;
-			subscriptionId = undefined;
 		}
-	} //Check subscription and like status when the component is mounted or when the video changes
-	$effect(() => {
-		// Only make API calls if user is authenticated
-		if (!$userStore) {
-			// Reset states when user is not logged in
-			isSubscribed = false;
-			subscriptionId = undefined;
-			videoLiked = null;
-			return;
-		}
-
-		if (video?.channelId) {
-			checkSubscription();
-		}
-		if (video?.id) {
-			checkLike();
-		}
-	});
-
-	// Gestisce il like del video
-	async function handleLike() {
-		if (!$userStore) {
-			goto('/api/auth/login');
-			return;
-		}
-
-		let rating = 'like';
-		if (videoLiked === true) {
-			rating = 'none'; // Already liked, so unlike it
-		}
-
-		isLoadingLike = true;
-		try {
-			const response = await fetch('/api/user/like', {
-				method: 'POST',
-				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify({ videoId: video.id, rating: rating })
-			});
-
-			if (response.ok) {
-				videoLiked = rating === 'like' ? true : null;
-			} else {
-				console.error('Failed to like video:', await response.text());
+		if (navigator.clipboard) {
+			try {
+				await navigator.clipboard.writeText(shareUrl);
+				copied = true;
+				setTimeout(() => {
+					copied = false;
+				}, 2000);
+			} catch (err) {
+				console.error('Clipboard write failed:', err);
 			}
-		} catch (error) {
-			console.error('Error liking video:', error);
-		} finally {
-			isLoadingLike = false;
 		}
 	}
 
-	// Gestisce il dislike del video
-	async function handleDislike() {
-		if (!$userStore) {
-			goto('/api/auth/login');
+	const client = useQueryClient();
+
+	// Stessa query key di ChannelHeader: montati insieme fanno una richiesta sola.
+	const subscription = subscriptionState(
+		() => video?.channelId ?? '',
+		() => !!user
+	);
+
+	// Le mutation partono solo da un click sui bottoni, che esistono solo dentro
+	// il ramo in cui `video` c'e': l'id si legge da qui una volta sola.
+	const videoId = $derived(video?.id ?? '');
+
+	const like = $derived(user && videoId ? likeStatus(videoId) : undefined);
+	const videoLiked = $derived(like?.current?.videoLiked ?? null);
+
+	async function handleRating(target: 'like' | 'dislike') {
+		if (!user) {
+			// L'endpoint risponde con un 302 verso Google: serve una navigazione
+			// del browser, non il router. `goto` in SvelteKit 3 rifiuta le
+			// destinazioni che non sono pagine dell'app.
+			window.location.href = resolve('api/auth/login');
+			return;
+		}
+		if (!like) return;
+
+		const already = target === 'like' ? videoLiked === true : videoLiked === false;
+		const rating = already ? 'none' : target;
+
+		// L'override e' l'aggiornamento ottimistico; il valore vero torna con la
+		// risposta del comando, che rinfresca la lettura lato server.
+		try {
+			await rateVideo({ videoId, rating }).updates(
+				like.withOverride(() => ({
+					videoLiked: rating === 'like' ? true : rating === 'dislike' ? false : null
+				}))
+			);
+		} catch (cause) {
+			// Se il comando fallisce l'override viene scartato da se' e il pollice
+			// torna com'era. Non c'e' dove mostrare l'errore, come non c'era prima
+			// con `rate.error`: qui serve solo a non lasciarlo non gestito.
+			console.error('Valutazione fallita:', cause);
 			return;
 		}
 
-		let rating = 'dislike';
-		if (videoLiked === false) {
-			rating = 'none'; // Already disliked, so remove dislike
-		}
-
-		isLoadingLike = true;
-		try {
-			const response = await fetch('/api/user/like', {
-				method: 'POST',
-				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify({ videoId: video.id, rating: rating })
-			});
-
-			if (response.ok) {
-				videoLiked = rating === 'dislike' ? false : null;
-			} else {
-				console.error('Failed to dislike video:', await response.text());
-			}
-		} catch (error) {
-			console.error('Error disliking video:', error);
-		} finally {
-			isLoadingLike = false;
-		}
-	}
-
-	// Gestisce l'iscrizione o la cancellazione dell'iscrizione
-	async function handleSubscription() {
-		if (!$userStore) goto('/api/auth/login');
-
-		isLoading = true;
-		try {
-			if (isSubscribed) {
-				// Unsubscribe
-				if (subscriptionId) {
-					const response = await fetch('/api/user/unsubscribe', {
-						method: 'POST',
-						headers: { 'Content-Type': 'application/json' },
-						body: JSON.stringify({ subscriptionId })
-					});
-					if (response.ok) {
-						isSubscribed = false;
-						subscriptionId = undefined;
-					} else {
-						console.error('Failed to unsubscribe:', await response.text());
-					}
-				}
-			} else {
-				// Subscribe
-				const response = await fetch('/api/user/subscribe', {
-					method: 'POST',
-					headers: { 'Content-Type': 'application/json' },
-					body: JSON.stringify({ channelId: video.channelId })
-				});
-				if (response.ok) {
-					const data = await response.json();
-					isSubscribed = true;
-					subscriptionId = data.subscriptionId;
-				} else {
-					console.error('Failed to subscribe:', await response.text());
-				}
-			}
-		} catch (error) {
-			console.error('Error toggling subscription:', error);
-		} finally {
-			isLoading = false;
-		}
+		// Un like cambia la playlist "Liked", che vive sotto un'altra chiave ed e'
+		// paginata, quindi resta su TanStack.
+		client.invalidateQueries({ queryKey: queryKeys.likedVideos() });
 	}
 </script>
 
-{#await video}
-	<SkeletonPlayer />
-{:then video}
+<!-- Il genitore ha gia' atteso la promise, quindi qui `video` e' un valore:
+     l'{#await} che c'era prima era inerte e il suo {:catch} irraggiungibile.
+     Serve invece la guardia sul null, che getVideoById restituisce per un
+     video inesistente e che nessuno controllava. -->
+{#if video}
 	{@const src = `https://www.youtube.com/embed/${video.id}`}
 	<div class="flex w-full flex-col gap-2">
 		<iframe
@@ -198,35 +120,36 @@
 					loading="lazy"
 					class="size-14 rounded-full contain-content"
 					src={video.avatarUrl}
+					referrerpolicy="no-referrer"
 					alt="Channel Avatar"
 				/>
 				<div class="flex flex-col">
 					<a
-						href={`/channel/${video.channelId}`}
+						href={resolve('/channel/[channelId]', { channelId: video.channelId })}
 						class="text-primary font-semibold hover:underline"
 					>
 						<h2 class="font-bold">{video.channelTitle}</h2>
 					</a>
-					<p class="text-secondary font-light">
-						{formatSubscriberCount('1234567')} di iscritti
-					</p>
+					{#if video.channelSubscriberCount && !video.channelSubscriberCountHidden}
+						<p class="text-secondary font-light">
+							{formatSubscriberCount(video.channelSubscriberCount)} di iscritti
+						</p>
+					{/if}
 				</div>
-				{#if $userStore}
+				{#if user}
 					<button
-						class="text-background ml-2 h-fit cursor-pointer rounded-3xl px-4 py-2 align-middle font-semibold {isSubscribed
+						class="text-background ml-2 h-fit cursor-pointer rounded-3xl px-4 py-2 align-middle font-semibold {subscription.isSubscribed
 							? 'bg-background-secondary text-primary'
 							: 'bg-primary'}"
-						onclick={handleSubscription}
+						onclick={subscription.toggle}
 					>
-						{isSubscribed ? 'Iscritto' : 'Iscriviti'}
+						{subscription.isSubscribed ? 'Iscritto' : 'Iscriviti'}
 					</button>
 				{:else}
 					<button
 						class="bg-background-secondary text-primary rounded-full px-4 py-2 font-bold"
-						onclick={() => (window.location.href = '/api/auth/login')}
+						onclick={() => (window.location.href = '/api/auth/login')}>Subscribe</button
 					>
-						Subscribe
-					</button>
 				{/if}
 			</div>
 
@@ -234,23 +157,18 @@
 				<button
 					class="bg-background-secondary hover:bg-background-tertiary text-primary flex h-full cursor-pointer items-center gap-2 rounded-l-full px-4 {videoLiked ===
 					true
-						? '!bg-background-tertiary'
+						? 'bg-background-tertiary!'
 						: ''}"
 					aria-label="like"
-					onclick={handleLike}
-					disabled={isLoadingLike}
+					aria-pressed={videoLiked === true}
+					onclick={() => handleRating('like')}
+					disabled={rateVideo.pending > 0}
 				>
-					<svg
-						class="text-primary h-6 w-6"
-						xmlns="http://www.w3.org/2000/svg"
-						viewBox="0 0 24 24"
-						fill={videoLiked === true ? 'currentColor' : 'none'}
-						stroke={videoLiked === true ? 'none' : 'currentColor'}
-					>
-						<path
-							d="M2 21h4V9H2v12zM22 9c0-1.1-.9-2-2-2h-6.31l.95-4.57.03-.32c0-.41-.17-.79-.44-1.06L13 1 6.59 7.41C6.22 7.78 6 8.3 6 8.83V19c0 1.1.9 2 2 2h9c.83 0 1.54-.5 1.84-1.22l3.02-7.05c.09-.23.14-.47.14-.73v-1z"
-						/>
-					</svg>
+					{#if videoLiked === true}
+						<IconThumbUp class="text-primary h-6 w-6" data-icon-variant="filled" />
+					{:else}
+						<IconThumbUpOutline class="text-primary h-6 w-6" data-icon-variant="outline" />
+					{/if}
 					<span class="text-primary text-center font-semibold text-nowrap">
 						{formatSubscriberCount(video.statistics.likeCount ? video.statistics.likeCount : '0')}
 					</span>
@@ -258,82 +176,45 @@
 				<button
 					class="bg-background-secondary text-primary hover:bg-background-tertiary flex h-full cursor-pointer items-center rounded-r-full px-4 {videoLiked ===
 					false
-						? '!bg-background-tertiary'
+						? 'bg-background-tertiary!'
 						: ''}"
 					aria-label="dislike"
-					onclick={handleDislike}
-					disabled={isLoadingLike}
+					aria-pressed={videoLiked === false}
+					onclick={() => handleRating('dislike')}
+					disabled={rateVideo.pending > 0}
 				>
-					<svg
-						xmlns="http://www.w3.org/2000/svg"
-						viewBox="0 0 24 24"
-						class="h-6 w-6 {videoLiked === false ? 'text-red-500' : 'text-primary'}"
-						fill={videoLiked === false ? 'currentColor' : 'none'}
-						stroke={videoLiked === false ? 'none' : 'currentColor'}
-					>
-						<path
-							d="M17 4H6.57c-1.07 0-1.98.67-2.19 1.61l-1.34 6C2.77 12.85 3.82 14 5.23 14h4.23l-1.52 4.94C7.62 19.97 8.46 21 9.62 21c.58 0 1.14-.24 1.52-.65L17 14h4V4h-4zm-6.6 15.67c-.19.21-.48.33-.78.33-.26 0-.5-.11-.63-.3-.07-.1-.15-.26-.09-.47l1.52-4.94.4-1.29H5.23c-.41 0-.8-.17-1.03-.46-.12-.15-.25-.4-.18-.72l1.34-6c.1-.47.61-.82 1.21-.82H16v8.61l-5.6 6.06zM20 13h-3V5h3v8z"
-						/>
-					</svg>
+					{#if videoLiked === false}
+						<IconThumbDown class="text-primary h-6 w-6" data-icon-variant="filled" />
+					{:else}
+						<IconThumbDownOutline class="text-primary h-6 w-6" data-icon-variant="outline" />
+					{/if}
 				</button>
 
 				<button
-					class="bg-background-secondary text-primary hover:bg-background-tertiary ml-3 flex cursor-pointer items-center gap-2 rounded-full px-3 py-1 font-semibold"
+					class="bg-background-secondary hover:bg-background-tertiary text-primary ml-3 flex cursor-pointer items-center gap-2 rounded-full px-4 py-2 font-medium transition-colors"
+					onclick={handleShare}
+					aria-label="Condividi video"
 				>
-					<svg
-						xmlns="http://www.w3.org/2000/svg"
-						viewBox="0 0 24 24"
-						class="h-6 w-6"
-						fill="none"
-						stroke="currentColor"
-						stroke-width="2"
-						stroke-linecap="round"
-						stroke-linejoin="round"
-					>
-						<circle cx="18" cy="5" r="3"></circle>
-						<circle cx="6" cy="12" r="3"></circle>
-						<circle cx="18" cy="19" r="3"></circle>
-						<line x1="8.59" y1="13.51" x2="15.42" y2="17.49"></line>
-						<line x1="15.41" y1="6.51" x2="8.59" y2="10.49"></line>
-					</svg>
-					Condividi
-				</button>
-				<button
-					class="bg-background-secondary hover:bg-background-tertiary text-primary ml-3 flex cursor-pointer items-center gap-2 rounded-full px-3 py-1 font-semibold text-nowrap"
-				>
-					<svg
-						xmlns="http://www.w3.org/2000/svg"
-						viewBox="0 0 24 24"
-						fill="currentColor"
-						class="h-6 w-6"
-					>
-						<path
-							d="M12 16V4m0 12l-4-4m4 4l4-4M4 20h16"
-							stroke="currentColor"
-							stroke-width="2"
-							stroke-linecap="round"
-							stroke-linejoin="round"
-							fill="none"
-						/>
-					</svg>
-					Scarica
-				</button>
-				<button
-					class="text-primary bg-background-secondary hover:bg-background-tertiary ml-3 hidden size-12 cursor-pointer rounded-full pb-4 text-2xl font-bold md:block"
-				>
-					...
+					{#if copied}
+						<IconCheck class="h-5 w-5 text-green-500" />
+						<span class="text-sm text-green-500">Copiato!</span>
+					{:else}
+						<IconShareVariant class="h-5 w-5" />
+						<span class="text-sm">Condividi</span>
+					{/if}
 				</button>
 			</div>
 		</div>
+
 		<div class="text-primary bg-background-secondary cursor-pointer rounded-2xl p-3">
 			<h3 class="text-sm font-semibold">
 				{formatSubscriberCount(video.statistics.viewCount)} visualizzazioni {formatData(
 					video.publishedAt
 				)}
 			</h3>
-			<DescriptionBox description={video.desc}></DescriptionBox>
+			<DescriptionBox description={video.desc} />
 		</div>
 	</div>
-{:catch error}
-	<p>Errore nel caricamento del video: {error?.message ?? error}</p>
-{/await}
+{:else}
+	<p class="text-secondary p-4">Questo video non è disponibile.</p>
+{/if}

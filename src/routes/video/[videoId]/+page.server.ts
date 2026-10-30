@@ -1,29 +1,21 @@
-// src/routes/video/[videoId]/+page.server.ts
-import * as apis from '$lib/api/youtube';
+import * as apis from '#lib/api/youtube.js';
+import type { PageServerLoad } from './$types';
 
-export async function load({ params }) {
-	try {
-		const videoId = params.videoId;
-		const videoPromise = apis.getVideoById(videoId);
-		const commentsPromise = apis.getComments(videoId);
-		const relatedVideosPromise = apis.getVideos(10);
+export const load: PageServerLoad = async ({ params }) => {
+	const { videoId } = params;
+	const comments = apis.getComments(videoId);
+	const related = apis.getVideos(10);
 
-		return {
-			video: videoPromise,
-			comments: commentsPromise.then((data) => data.comments),
-			commentsNextPageToken: commentsPromise.then((data) => data.nextPageToken),
-			relatedVideos: relatedVideosPromise.then((data) => data.videos),
-			nextPageToken: relatedVideosPromise.then((data) => data.nextPageToken),
-			error: null
-		};
-	} catch (error) {
-		return {
-			video: Promise.resolve(null),
-			comments: Promise.resolve([]),
-			commentsNextPageToken: Promise.resolve(undefined),
-			relatedVideos: Promise.resolve([]),
-			nextPageToken: Promise.resolve(undefined),
-			error: error instanceof Error ? error.message : 'Errore sconosciuto'
-		};
-	}
-}
+	// Ogni promise viaggia in streaming e viene attesa dal componente o dalla
+	// query che la consuma; nessun try/catch qui, perche' queste funzioni sono
+	// async e non lanciano mai in modo sincrono.
+	return {
+		videoId,
+		video: apis.getVideoById(videoId),
+		commentsFirstPage: comments,
+		relatedFirstPage: related.then((data) => ({
+			videos: data.videos,
+			nextPageToken: data.nextPageToken
+		}))
+	};
+};

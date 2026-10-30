@@ -1,21 +1,20 @@
-// src/routes/search/[searchId]/+page.server.ts
-import * as apis from '$lib/api/youtube';
+import * as apis from '#lib/api/youtube.js';
+import { parseSearchFilters } from '#lib/types/searchFilters.js';
+import type { PageServerLoad } from './$types';
 
-export async function load({ params }) {
-	try {
-		const searchId = params.searchId;
-		const searchResultsPromise = apis.searchVideos(searchId);
+export const load: PageServerLoad = async ({ params, url }) => {
+	// Come per le categorie della home, i filtri stanno nell'URL: una ricerca
+	// filtrata e' un indirizzo, quindi condivisibile e renderizzata dal server.
+	const filters = parseSearchFilters(url.searchParams);
+	const results = apis.search(params.searchId, filters);
 
-		return {
-			searchResults: searchResultsPromise.then((data) => data.videos),
-			nextPageToken: searchResultsPromise.then((data) => data.nextPageToken),
-			error: null
-		};
-	} catch (error) {
-		return {
-			searchResults: Promise.resolve([]),
-			nextPageToken: Promise.resolve(undefined),
-			error: error instanceof Error ? error.message : 'Errore sconosciuto'
-		};
-	}
-}
+	return {
+		query: params.searchId,
+		filters,
+		firstPage: results.then((data) => ({
+			videos: data.videos,
+			channels: data.channels,
+			nextPageToken: data.nextPageToken
+		}))
+	};
+};

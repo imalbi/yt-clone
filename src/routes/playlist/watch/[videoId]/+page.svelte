@@ -1,71 +1,67 @@
 <script lang="ts">
-	import VideoPlayer from '$lib/components/videoPlayer.svelte';
-	import CommentsCard from '$lib/components/CommentsCard.svelte';
-	import { fly } from 'svelte/transition';
-	import SkeletonPlayer from '$lib/components/SkeletonPlayer.svelte';
-	import { likedVideosStore } from '$lib/stores/likedVideosStore';
+	import { createQuery } from '@tanstack/svelte-query';
+	import { resolve } from '$app/paths';
+	import IconChevronLeft from '~icons/mdi/chevron-left';
+	import IconChevronRight from '~icons/mdi/chevron-right';
+	import VideoPlayer from '#lib/components/videoPlayer.svelte';
+	import CommentsCard from '#lib/components/CommentsCard.svelte';
+	import SkeletonPlayer from '#lib/components/SkeletonPlayer.svelte';
+	import PlaylistQueue from '#lib/components/PlaylistQueue.svelte';
 	import { goto } from '$app/navigation';
-	import { page } from '$app/state';
-	import { onMount } from 'svelte';
+	import { playlistPageOptions } from '#lib/queries.js';
+	import { playlistOrder } from '#lib/stores/playlistOrder.svelte.js';
+	import { watchHref } from '#lib/utils/watchHref.js';
 
 	let { data } = $props();
-	let isLoaded = $state(false);
-	let error = $state<string | null>(null);
 
-	// Get current video ID from URL
-	let currentVideoId = $derived(page.params.videoId);
+	const currentVideoId = $derived(data.videoId);
+	const isLiked = $derived(data.list === 'LL');
 
-	// Get playlist from store
-	let likedVideosIds = $derived($likedVideosStore);
+	// Per i piaciuti e' la stessa query key della pagina playlist: passando di
+	// qui la lista e' gia' in cache e non viene richiesta di nuovo.
+	const items = createQuery(() => playlistPageOptions(data.list));
 
-	// Find current video index in playlist
-	let currentIndex = $derived(likedVideosIds.findIndex((id) => id === currentVideoId));
+	// L'ordine scelto a mano con il drag and drop esiste solo per i piaciuti.
+	const playlist = $derived(
+		isLiked ? playlistOrder.sort(items.data?.videos ?? []) : (items.data?.videos ?? [])
+	);
+	const isLoaded = $derived(items.isSuccess);
+	const currentIndex = $derived(playlist.findIndex((v) => v.id === currentVideoId));
+	const hasPrevious = $derived(currentIndex > 0);
+	const hasNext = $derived(currentIndex >= 0 && currentIndex < playlist.length - 1);
 
-	// Check if there are previous/next videos
-	let hasPrevious = $derived(currentIndex > 0);
-	let hasNext = $derived(currentIndex < likedVideosIds.length - 1);
+	// Un video che non e' nella lista caricata non si risolve con un redirect
+	// automatico: si dice com'e' e si offre la strada di ritorno.
+	const missing = $derived(isLoaded && currentIndex === -1);
+	const backHref = $derived(
+		isLiked
+			? resolve('/playlist/liked')
+			: resolve('/playlist/[playlistId]', { playlistId: data.list })
+	);
 
-	onMount(() => {
-		likedVideosStore.initFromApi(data.accessToken);
-		if (page.params.videoId) {
-			// Ensure the current video ID is valid
-			if (!likedVideosIds.includes(currentVideoId)) {
-				goto('/playlist/liked');
-			}
-		} else {
-			goto('/playlist/liked');
-		}
-	});
-
-	// Navigation functions
 	function goToPrevious() {
 		if (hasPrevious) {
-			const previousVideoId = likedVideosIds[currentIndex - 1];
-			goto(`/playlist/watch/${previousVideoId}`);
+			goto(watchHref(playlist[currentIndex - 1].id, data.list));
 		}
 	}
 
 	function goToNext() {
 		if (hasNext) {
-			const nextVideoId = likedVideosIds[currentIndex + 1];
-			goto(`/playlist/watch/${nextVideoId}`);
+			goto(watchHref(playlist[currentIndex + 1].id, data.list));
 		}
 	}
-
-	// Set loaded state when we have playlist data
-	$effect(() => {
-		isLoaded = likedVideosIds.length > 0;
-	});
 </script>
 
 <main class="w-full p-4 xl:p-8">
-	<div class="grid grid-cols-1 gap-8 xl:grid-cols-[1fr_440px] xl:grid-rows-[auto_auto_1fr]">
+	<div
+		class="grid grid-cols-1 gap-8 xl:grid-cols-[minmax(0,1fr)_26rem] xl:grid-rows-[auto_auto_1fr]"
+	>
 		<!-- Video Player Section -->
 		<div class="w-full xl:col-start-1 xl:row-start-1">
 			{#await data.video}
 				<SkeletonPlayer />
 			{:then video}
-				<VideoPlayer {video} />
+				<VideoPlayer {video} user={data.user} />
 			{:catch error}
 				<p>Error loading video: {error.message}</p>
 			{/await}
@@ -80,18 +76,12 @@
 						onclick={goToPrevious}
 						disabled={!hasPrevious}
 					>
-						<svg class="h-4 w-4" fill="currentColor" viewBox="0 0 20 20">
-							<path
-								fill-rule="evenodd"
-								d="M12.707 5.293a1 1 0 010 1.414L9.414 10l3.293 3.293a1 1 0 01-1.414 1.414l-4-4a1 1 0 010-1.414l4-4a1 1 0 011.414 0z"
-								clip-rule="evenodd"
-							></path>
-						</svg>
-						Previous
+						<IconChevronLeft class="h-4 w-4" />
+						Precedente
 					</button>
 
 					<span class="text-primary text-sm">
-						{currentIndex + 1} / {likedVideosIds.length}
+						{currentIndex + 1} / {playlist.length}
 					</span>
 
 					<button
@@ -99,72 +89,44 @@
 						onclick={goToNext}
 						disabled={!hasNext}
 					>
-						Next
-						<svg class="h-4 w-4" fill="currentColor" viewBox="0 0 20 20">
-							<path
-								fill-rule="evenodd"
-								d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z"
-								clip-rule="evenodd"
-							></path>
-						</svg>
+						Successivo
+						<IconChevronRight class="h-4 w-4" />
 					</button>
 				</div>
-
-				<a href="/playlist/liked">
-					<div class="text-primary text-sm font-medium">Playlist: Liked Videos</div>
-				</a>
 			</div>
 		</div>
 
-		<!-- Playlist Videos Section -->
-		<div
-			class="w-full gap-4 sm:grid sm:grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:col-start-2 xl:row-span-3 xl:row-start-1 xl:flex xl:w-110 xl:flex-col"
-		>
-			<div class="mb-4">
-				<h3 class="text-primary mb-2 text-lg font-semibold">
-					Playlist Videos ({likedVideosIds.length})
-				</h3>
-			</div>
-
-			{#if error}
-				<p>
-					<strong class="text-primary">Errore nel caricamento dei video: {error}</strong>
-				</p>
-			{:else if !isLoaded}
-				<div class="text-primary">Loading playlist...</div>
-			{:else}
-				{#each likedVideosIds as videoId, index (videoId)}
-					<div in:fly|local={{ x: 50, duration: 200 }} class="relative">
-						<!-- Highlight current video -->
-						<div
-							class="relative {videoId === currentVideoId
-								? 'rounded-lg ring-2 ring-blue-500'
-								: ''} bg-background-secondary hover:bg-background-tertiary mb-2 rounded-lg p-2 transition-colors"
-						>
-							<a href={`/playlist/watch/${videoId}`} class="block">
-								<div class="flex items-center gap-3">
-									<div class="text-secondary w-6 font-mono text-sm">
-										{index + 1}
-									</div>
-									<div class="flex-1">
-										<div class="text-primary truncate text-sm font-medium">
-											Video ID: {videoId}
-										</div>
-										{#if videoId === currentVideoId}
-											<div class="text-xs font-medium text-blue-500">▶ Now Playing</div>
-										{/if}
-									</div>
-								</div>
-							</a>
-						</div>
+		<aside class="w-full xl:col-start-2 xl:row-span-3 xl:row-start-1">
+			<div class="xl:sticky xl:top-20 xl:max-h-[calc(100dvh-6rem)] xl:overflow-y-auto xl:pr-1">
+				{#if items.isError}
+					<p class="text-primary bg-background-secondary rounded-xl p-4">
+						Errore nel caricamento della playlist: {items.error.message}
+					</p>
+				{:else if !isLoaded}
+					<div class="text-secondary bg-background-secondary rounded-xl p-4">
+						Caricamento playlist…
 					</div>
-				{/each}
-			{/if}
-		</div>
+				{:else if missing}
+					<div class="text-primary bg-background-secondary rounded-xl p-4">
+						<p>Questo video non è tra quelli caricati di «{data.listTitle}».</p>
+						<a href={backHref} class="mt-2 inline-block text-blue-500 hover:underline">
+							Torna alla playlist
+						</a>
+					</div>
+				{:else}
+					<PlaylistQueue
+						videos={playlist}
+						{currentVideoId}
+						list={data.list}
+						title={data.listTitle}
+					/>
+				{/if}
+			</div>
+		</aside>
 
 		<!-- Comments Section -->
 		<div class="w-full xl:col-start-1 xl:row-start-3 xl:min-h-0">
-			<CommentsCard comments={data.comments} commentsNextPageToken={data.commentsNextPageToken} />
+			<CommentsCard videoId={data.videoId} firstPage={data.commentsFirstPage} user={data.user} />
 		</div>
 	</div>
 </main>

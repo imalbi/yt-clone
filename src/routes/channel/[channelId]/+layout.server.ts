@@ -1,39 +1,20 @@
-import { getChannelById, getSubscriptions } from '$lib/api/youtube';
+import { getChannelById, getSubscriptions } from '#lib/api/youtube.js';
 import { error } from '@sveltejs/kit';
+import type { LayoutServerLoad } from './$types';
 
-export async function load({ params, cookies }) {
+export const load: LayoutServerLoad = async ({ params, locals }) => {
 	const { channelId } = params;
-	const accessToken = cookies.get('access_token');
+	const accessToken = locals.accessToken;
 
-	console.log('Layout loading channel:', channelId);
+	// Gli errori dell'API salgono a `handleError`, che li traduce in stato e testo.
+	const [channel, subscriptions] = await Promise.all([
+		getChannelById(channelId),
+		accessToken ? getSubscriptions(accessToken) : Promise.resolve([])
+	]);
 
-	if (!channelId) {
-		console.log('No channelId provided');
-		throw error(404, 'Channel not found');
+	if (!channel) {
+		error(404, 'Canale non trovato');
 	}
 
-	try {
-		console.log('Fetching channel data for:', channelId);
-		const channelPromise = getChannelById(channelId);
-		const subscriptionsPromise = accessToken ? getSubscriptions(accessToken) : Promise.resolve([]);
-
-		const [channel, subscriptions] = await Promise.all([channelPromise, subscriptionsPromise]);
-
-		if (!channel) {
-			console.log('Channel not found in API response');
-			throw error(404, 'Channel not found');
-		}
-
-		console.log('Channel loaded successfully:', channel.title);
-		console.log('Subscriptions loaded:', subscriptions.length);
-
-		return {
-			channel,
-			subscriptions
-		};
-	} catch (err) {
-		console.error('Error in layout.server.ts:', err);
-		const message = err instanceof Error ? err.message : 'Unknown error';
-		throw error(500, `Failed to fetch channel data: ${message}`);
-	}
-}
+	return { channelId, channel, subscriptions };
+};

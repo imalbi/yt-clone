@@ -1,34 +1,28 @@
 <script lang="ts">
-	import ChannelHeader from '$lib/components/ChannelHeader.svelte';
+	import { resolve } from '$app/paths';
+	import ChannelHeader from '#lib/components/ChannelHeader.svelte';
 	import { page } from '$app/state';
 	let { data, children } = $props();
+	const channelId = $derived(data.channelId);
 	let aClass = 'text-primary hover:border-secondary px-4 py-2 hover:border-b-2';
-	$inspect(page);
 </script>
 
 <main class="w-full xl:m-auto xl:w-[80%]">
 	{#if data.channel}
-		<ChannelHeader channel={data.channel} />
+		<ChannelHeader channel={data.channel} user={data.user} />
 
 		<nav class="flex gap-2 pb-2">
 			<a
-				href={`/channel/${page.params.channelId}`}
+				href={resolve('/channel/[channelId]', { channelId })}
 				class={aClass}
-				class:active={page.url.pathname === `/channel/${page.params.channelId}`}
+				class:active={page.url.pathname === resolve('/channel/[channelId]', { channelId })}
 			>
 				Videos
 			</a>
 			<a
-				href={`/channel/${page.params.channelId}/Posts`}
+				href={resolve('/channel/[channelId]/info', { channelId })}
 				class={aClass}
-				class:active={page.url.pathname === `/channel/${page.params.channelId}/Posts`}
-			>
-				Posts
-			</a>
-			<a
-				href={`/channel/${page.params.channelId}/info`}
-				class={aClass}
-				class:active={page.url.pathname === `/channel/${page.params.channelId}/info`}
+				class:active={page.url.pathname === resolve('/channel/[channelId]/info', { channelId })}
 			>
 				Info
 			</a>

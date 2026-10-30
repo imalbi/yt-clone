@@ -21,3 +21,12 @@ Thumbs.db
 # Vite
 vite.config.js.timestamp-*
 vite.config.ts.timestamp-*
+
+# Planning artifacts
+docs/superpowers/
+
+# Isolated feature worktrees
+.worktrees/
+
+# Tooling caches
+.impeccable/

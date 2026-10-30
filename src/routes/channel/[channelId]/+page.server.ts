@@ -1,21 +1,15 @@
-import { getVideosByChannelId } from '$lib/api/youtube';
-import { error } from '@sveltejs/kit';
+import { getVideosByChannelId } from '#lib/api/youtube.js';
+import { parseChannelOrder } from '#lib/types/channelOrder.js';
+import type { PageServerLoad } from './$types';
 
-export async function load({ params }) {
-	const { channelId } = params;
+export const load: PageServerLoad = async ({ params, url }) => {
+	const order = parseChannelOrder(url.searchParams.get('order'));
 
-	if (!channelId) {
-		throw error(404, 'Channel not found');
-	}
-
-	try {
-		const videosPromise = getVideosByChannelId(channelId);
-
-		return {
-			videos: videosPromise.then((data) => data.videos)
-		};
-	} catch (err) {
-		const message = err instanceof Error ? err.message : 'Unknown error';
-		throw error(500, `Failed to fetch videos: ${message}`);
-	}
-}
+	// L'esistenza del canale la verifica gia' il layout; qui serve solo la lista.
+	// `getVideosByChannelId` e' async e non lancia in modo sincrono, quindi il
+	// try/catch che avvolgeva questa chiamata era irraggiungibile.
+	return {
+		order,
+		videos: getVideosByChannelId(params.channelId, order).then((data) => data.videos)
+	};
+};

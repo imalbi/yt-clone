@@ -113,9 +113,6 @@ export function formatTimeAgo(isoDateString: string) {
 	return years === 1 ? '1 anno fa' : `${years} anni fa`;
 }
 // Genera un numero intero casuale tra min (inclusivo) e max (esclusivo).
-export function randomInt(min: number, max: number): number {
-	return Math.floor(Math.random() * (max - min)) + min;
-}
 
 export function formatData(dataIn: string) {
 	const dataPubblicazione = new Date(dataIn);
@@ -128,4 +125,57 @@ export function formatData(dataIn: string) {
 	const formattatore = new Intl.DateTimeFormat('it-IT', opzioniDiFormattazione);
 	const stringaFormattata = formattatore.format(dataPubblicazione);
 	return stringaFormattata;
+}
+
+/**
+ * Converte una durata ISO 8601 della Data API (`PT1H2M13S`) in secondi.
+ * Restituisce undefined su input assente o non riconosciuto, cosi' chi la mostra
+ * puo' semplicemente omettere il badge invece di stampare "NaN".
+ */
+export function parseIsoDuration(iso: string | undefined): number | undefined {
+	if (!iso) return undefined;
+	const match = /^P(?:(\d+)D)?T(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?$/.exec(iso);
+	if (!match) return undefined;
+
+	const [, d, h, m, s] = match.map((v) => (v ? Number(v) : 0));
+	return d * 86400 + h * 3600 + m * 60 + s;
+}
+
+/** Durata in formato `4:13` oppure `1:02:13`. */
+export function formatDuration(seconds: number | undefined): string | undefined {
+	if (seconds === undefined || seconds <= 0) return undefined;
+
+	const h = Math.floor(seconds / 3600);
+	const m = Math.floor((seconds % 3600) / 60);
+	const s = seconds % 60;
+	const pad = (n: number) => String(n).padStart(2, '0');
+
+	return h > 0 ? `${h}:${pad(m)}:${pad(s)}` : `${m}:${pad(s)}`;
+}
+
+/**
+ * Spezza un testo nei pezzi che sono indirizzi e in quelli che non lo sono,
+ * cosi' chi lo mostra rende ogni pezzo con Svelte invece di passare da
+ * `{@html}`: il testo dei commenti lo scrive un estraneo e non va mai iniettato
+ * come markup. Il match copre solo http e https, quindi uno schema
+ * `javascript:` non arriva nemmeno a diventare un href.
+ */
+export function linkify(text: string): { text: string; href?: string }[] {
+	const parts: { text: string; href?: string }[] = [];
+	let last = 0;
+
+	for (const match of text.matchAll(/https?:\/\/[^\s<]+/g)) {
+		const start = match.index ?? last;
+		// ponytail: la punteggiatura finale appartiene alla frase, non
+		// all'indirizzo. Taglia anche la parentesi chiusa di un link che ne
+		// contiene una (Wikipedia); serve un parser bilanciato solo se capita.
+		const url = match[0].replace(/[.,!?;:)\]}'"]+$/, '');
+
+		if (start > last) parts.push({ text: text.slice(last, start) });
+		parts.push({ text: url, href: url });
+		last = start + url.length;
+	}
+
+	if (last < text.length) parts.push({ text: text.slice(last) });
+	return parts;
 }

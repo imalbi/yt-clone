@@ -1,9 +1,9 @@
 //src/routes/iscrizioni/+page.server.ts
-import { getSubscriptions } from '$lib/api/youtube';
+import { getSubscriptions } from '#lib/api/youtube.js';
 import { redirect } from '@sveltejs/kit';
 
-export async function load({ cookies }) {
-	const accessToken = cookies.get('access_token');
+export async function load({ locals }) {
+	const accessToken = locals.accessToken;
 	if (!accessToken) {
 		throw redirect(302, '/api/auth/login');
 	}

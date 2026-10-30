@@ -1,18 +1,15 @@
-import { json } from '@sveltejs/kit';
-import * as apis from '$lib/api/youtube';
+import { error } from '@sveltejs/kit';
+import * as apis from '#lib/api/youtube.js';
+import { parseSearchFilters } from '#lib/types/searchFilters.js';
 
 export async function GET({ url }) {
 	const pageToken = url.searchParams.get('pageToken') ?? undefined;
 	const query = url.searchParams.get('q');
 
-	if (!query) {
-		return json({ error: 'Query is required' }, { status: 400 });
-	}
+	if (!query) error(400, 'Query is required');
 
-	try {
-		const searchResults = await apis.searchVideos(query, pageToken);
-		return json(searchResults);
-	} catch (error) {
-		return json({ error: 'Failed to fetch videos' }, { status: 500 });
-	}
+	// I filtri arrivano dalla query string, quindi vengono riconosciuti qui
+	// invece di essere inoltrati alla API cosi' come sono.
+	const filters = parseSearchFilters(url.searchParams);
+	return Response.json(await apis.search(query, filters, pageToken));
 }

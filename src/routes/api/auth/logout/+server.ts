@@ -1,16 +1,17 @@
-import { json, redirect } from '@sveltejs/kit';
-import { userStore } from '$lib/stores/userStore.js';
-//src/routes/api/auth/logout/+server.ts
-//TODO: Implement logout functionality
-export async function POST({ cookies }) {
-	// Remove the authentication cookie (example: 'session')
-	cookies.delete('session', { path: '/' });
-	// Clear user data from the store
-	userStore.set(null);
-	// Optionally, you can also clear other cookies related to authentication
-	cookies.delete('access_token', { path: '/' });
-	cookies.delete('refresh_token', { path: '/' });
-	cookies.delete('user_data', { path: '/' });
+import { redirect } from '@sveltejs/kit';
+import { clearSession } from '#lib/cookies.js';
 
-	throw redirect(302, '/'); // Redirect to the home page after logout
+/**
+ * La sessione vive nei cookie, quindi cancellarli e' tutto il logout.
+ *
+ * Qui c'era anche `userStore.set(null)`: una scrittura lato server su uno store
+ * di modulo, cioe' su un valore condiviso da tutte le richieste del processo.
+ * Non serviva (dopo il redirect il client rilegge `data.user` dal load) ed e' la
+ * strada piu' corta per far comparire i dati di un utente nella pagina di un
+ * altro. Spariva anche un cookie 'session' che nessuno ha mai creato.
+ */
+export function POST({ cookies }) {
+	clearSession(cookies);
+
+	redirect(302, '/');
 }

@@ -1,50 +1,45 @@
 <script lang="ts">
-	import { formatSubscriberCount } from '$lib/scripts/scripts';
+	import { resolve } from '$app/paths';
+	import { formatSubscriberCount } from '#lib/scripts/scripts.js';
+	import { avatarUrl } from '#lib/avatar.js';
+	import { unsubscribe as unsubscribeChannel } from '#lib/youtube.remote.js';
 	import type { PageData } from './$types';
 
 	let { data }: { data: PageData } = $props();
 
-	// Crea una copia reattiva dei dati
-	let subscriptions = $state(data.subscriptions || []);
+	// Lo stato locale sono gli id tolti, non una copia della lista: cosi' `data`
+	// resta letto dentro un $derived e la pagina segue il `load` anche quando
+	// ci si torna navigando, invece di restare ferma al primo caricamento.
+	let removed = $state<string[]>([]);
 
-	function getThumbnailUrl(thumbnails: any) {
-		let url = '';
-		if (thumbnails?.medium?.url) url = thumbnails.medium.url;
-		else if (thumbnails?.default?.url) url = thumbnails.default.url;
-		else if (thumbnails?.high?.url) url = thumbnails.high.url;
-		else return 'https://via.placeholder.com/88x88?text=No+Image';
+	const subscriptions = $derived(
+		(data.subscriptions ?? []).filter((sub) => !removed.includes(sub.subscriptionId ?? ''))
+	);
 
-		// Forza il reload rimuovendo parametri che potrebbero causare problemi
-		return url.replace(/=s\d+-c-k-c0x00ffffff-no-rj/, '=s240-c-k-c0x00ffffff-no-rj');
-	}
-
-	async function unsubscribe(subscriptionId: string | undefined) {
+	// La riga sparisce subito e torna al suo posto se la chiamata fallisce,
+	// invece di lasciare un alert e la lista invariata. Qui l'ottimismo resta a
+	// mano: `withOverride` aggiorna una remote query, e questa lista arriva dal
+	// `load`, non da una query.
+	async function unsubscribe(channelId: string, subscriptionId: string | undefined) {
 		if (!subscriptionId) return;
-		const response = await fetch('/api/user/unsubscribe', {
-			method: 'POST',
-			headers: {
-				'Content-Type': 'application/json'
-			},
-			body: JSON.stringify({ subscriptionId })
-		});
 
-		if (response.ok) {
-			// Aggiorna la lista reattiva
-			subscriptions = subscriptions.filter((sub) => sub.subscriptionId !== subscriptionId);
-		} else {
-			alert('Failed to unsubscribe. Please try again.');
+		removed = [...removed, subscriptionId];
+		try {
+			await unsubscribeChannel({ channelId, subscriptionId });
+		} catch {
+			removed = removed.filter((id) => id !== subscriptionId);
 		}
 	}
 </script>
 
 <main class="text-primary bg-background p-4 px-6 xl:m-auto xl:w-[55%]">
 	<h1 class=" mb-2 text-4xl font-bold">Tutte le iscrizioni</h1>
-	{#if subscriptions && subscriptions.length > 0}
+	{#if subscriptions.length > 0}
 		<ul role="list">
 			{#each subscriptions as channel (channel.id)}
 				<li class="flex flex-row justify-between gap-2 p-4">
 					<a
-						href={`/channel/${channel.id}`}
+						href={resolve('/channel/[channelId]', { channelId: channel.id })}
 						target="_blank"
 						rel="noopener noreferrer"
 						class="flex flex-row gap-2"
@@ -52,7 +47,8 @@
 						<div class="flex flex-row gap-2">
 							<img
 								class="size-30 rounded-full object-cover"
-								src={getThumbnailUrl(channel.thumbnails)}
+								src={avatarUrl(channel.thumbnails, channel.title)}
+								referrerpolicy="no-referrer"
 								alt="{channel.title} Avatar"
 							/>
 							<div>
@@ -71,7 +67,7 @@
 					</a>
 					<div class=" hidden items-center justify-center md:flex">
 						<button
-							onclick={() => unsubscribe(channel.subscriptionId)}
+							onclick={() => unsubscribe(channel.id, channel.subscriptionId)}
 							class="bg-background-secondary ml-2 h-fit cursor-pointer rounded-3xl px-4 py-2 align-middle font-semibold text-white"
 							>Disiscriviti</button
 						>

@@ -1,612 +1,797 @@
-import type { Video } from '$lib/api/mock';
-import type { Channel } from '$lib/types/channel';
+import type { z } from 'zod';
+import { parseIsoDuration } from '#lib/scripts/scripts.js';
+import type { Video } from '#lib/types/video.js';
+import type { Channel } from '#lib/types/channel.js';
+import type { CommentThread } from '#lib/types/commentThread.js';
+import type { VideoCategory } from '#lib/types/category.js';
+import type { Playlist } from '#lib/types/playlist.js';
+import { defaultChannelOrder, type ChannelOrder } from '#lib/types/channelOrder.js';
+import { defaultSearchFilters, type SearchFilters } from '#lib/types/searchFilters.js';
+import {
+	channelIdSchema,
+	channelItemSchema,
+	commentThreadItemSchema,
+	errorBodySchema,
+	listEnvelopeSchema,
+	playlistItemSchema,
+	playlistSchema,
+	ratingItemSchema,
+	searchItemSchema,
+	subscriptionIdSchema,
+	subscriptionItemSchema,
+	videoCategoryItemSchema,
+	videoItemSchema,
+	type ApiChannelItem,
+	type ApiComment,
+	type ApiPlaylist,
+	type ApiVideoItem
+} from '#lib/types/youtube-api.js';
 
-import { PUBLIC_YOUTUBE_API_KEY } from '$env/static/public';
-import type { CommentThread } from '$lib/types/commentThread';
+import { YOUTUBE_API_KEY } from '$app/env/private';
+
 const BASE_URL = 'https://www.googleapis.com/youtube/v3';
 
 /**
- * @returns A list of popular videos from the public YouTube API.
+ * Errore di rete o di API. `reason` e' il motivo che Google scrive nel corpo:
+ * un 403 puo' essere `quotaExceeded` come `commentsDisabled`, e lo stato da solo
+ * non li distingue.
  */
+export class YouTubeApiError extends Error {
+	constructor(
+		message: string,
+		readonly status: number,
+		readonly reason?: string
+	) {
+		super(message);
+		this.name = 'YouTubeApiError';
+	}
+}
+
+/**
+ * Lo stato HTTP con cui riferire un errore di Google. Un rifiuto 4xx si inoltra
+ * com'e': modificare il commento di un altro risponde 403, e presentarlo come
+ * 502 farebbe sembrare rotto il server. Solo i 5xx e gli errori sconosciuti
+ * diventano 502.
+ */
+export function upstreamStatus(cause: unknown): number {
+	return cause instanceof YouTubeApiError && cause.status < 500 ? cause.status : 502;
+}
+
+// --- Cache -----------------------------------------------------------------
+
+const TTL_MS = 5 * 60 * 1000;
+const MAX_ENTRIES = 200;
+
+/**
+ * La quota giornaliera e' 10.000 unita' e una sola visita alla home ne consuma
+ * gia' diverse. Senza questa cache un pomeriggio di ricariche esaurisce la
+ * giornata, e la pagina che l'utente vede a quel punto e' quella di errore.
+ *
+ * ponytail: Map in-process con TTL fisso. Su piu' istanze ognuna ha la sua
+ * copia; se un giorno servisse coerenza fra istanze, qui va un Redis.
+ */
+const cache = new Map<string, { at: number; data: unknown }>();
+
+function readCache(key: string): unknown {
+	const hit = cache.get(key);
+	if (!hit) return undefined;
+	if (Date.now() - hit.at > TTL_MS) {
+		cache.delete(key);
+		return undefined;
+	}
+	return hit.data;
+}
+
+function writeCache(key: string, data: unknown) {
+	// Il primo elemento di una Map e' il piu' vecchio inserito: basta quello
+	// per tenere la dimensione sotto controllo senza una LRU vera.
+	if (cache.size >= MAX_ENTRIES) {
+		const oldest = cache.keys().next().value;
+		if (oldest !== undefined) cache.delete(oldest);
+	}
+	cache.set(key, { at: Date.now(), data });
+}
+
+// --- Fetch e validazione ---------------------------------------------------
+
+function endpointOf(path: string) {
+	return path.split('?')[0];
+}
+
+async function fail(response: Response, path: string): Promise<never> {
+	// Il corpo di errore di Google contiene il motivo, mai la richiesta:
+	// nessun rischio di registrare la chiave.
+	const body = await response.text().catch(() => '');
+	throw new YouTubeApiError(
+		`Richiesta a ${endpointOf(path)} fallita (${response.status}) ${body.slice(0, 200)}`,
+		response.status,
+		reasonOf(body)
+	);
+}
+
+/** Il messaggio sta troncato a 200 caratteri: il motivo va letto dal corpo intero. */
+function reasonOf(body: string): string | undefined {
+	try {
+		return errorBodySchema.parse(JSON.parse(body)).error.errors[0]?.reason;
+	} catch {
+		return undefined;
+	}
+}
+
+type ParsedList<T> = { items: T[]; nextPageToken?: string; prevPageToken?: string };
+
+/**
+ * Valida la risposta contro lo schema dell'endpoint.
+ *
+ * Gli elementi sono validati uno per uno e quelli malformati vengono scartati:
+ * in un feed di venti video, uno con un campo mancante non deve far sparire gli
+ * altri diciannove. Se pero' cadono tutti, non e' un elemento difettoso ma lo
+ * schema che non combacia piu', e quello va fatto emergere invece di
+ * restituire una lista vuota che sembra "nessun risultato".
+ */
+function parseList<T>(raw: unknown, itemSchema: z.ZodType<T>, path: string): ParsedList<T> {
+	const envelope = listEnvelopeSchema.safeParse(raw);
+	if (!envelope.success) {
+		throw new YouTubeApiError(`Risposta inattesa da ${endpointOf(path)}`, 502);
+	}
+
+	const rawItems = envelope.data.items ?? [];
+	const items: T[] = [];
+	for (const item of rawItems) {
+		const parsed = itemSchema.safeParse(item);
+		if (parsed.success) items.push(parsed.data);
+	}
+
+	const dropped = rawItems.length - items.length;
+	if (dropped > 0 && items.length === 0) {
+		throw new YouTubeApiError(
+			`Schema non combaciante per ${endpointOf(path)}: scartati tutti i ${dropped} elementi`,
+			502
+		);
+	}
+	if (dropped > 0) {
+		console.warn(`${endpointOf(path)}: ${dropped} elementi scartati dalla validazione`);
+	}
+
+	return {
+		items,
+		nextPageToken: envelope.data.nextPageToken,
+		prevPageToken: envelope.data.prevPageToken
+	};
+}
+
+function requireKey() {
+	if (!YOUTUBE_API_KEY) {
+		throw new YouTubeApiError('YOUTUBE_API_KEY non configurata', 500);
+	}
+	return YOUTUBE_API_KEY;
+}
+
+/** Chiamata pubblica, autenticata dalla API key. Cacheabile: uguale per tutti. */
+async function getPublic<T>(
+	path: string,
+	itemSchema: z.ZodType<T>,
+	cacheable = true
+): Promise<ParsedList<T>> {
+	// La chiave non entra nella cache key: e' costante e non deve finire in memoria.
+	const cached = cacheable ? readCache(path) : undefined;
+	if (cached !== undefined) return parseList(cached, itemSchema, path);
+
+	const response = await fetch(`${BASE_URL}${path}&key=${requireKey()}`);
+	if (!response.ok) await fail(response, path);
+
+	const raw = await response.json();
+	const parsed = parseList(raw, itemSchema, path);
+	if (cacheable) writeCache(path, raw);
+	return parsed;
+}
+
+/** Chiamata per conto di un utente. Mai cacheata: la risposta e' personale. */
+async function getAuthed<T>(
+	path: string,
+	accessToken: string,
+	itemSchema: z.ZodType<T>
+): Promise<ParsedList<T>> {
+	const response = await fetch(`${BASE_URL}${path}`, {
+		headers: { Authorization: `Bearer ${accessToken}` }
+	});
+	if (!response.ok) await fail(response, path);
+	return parseList(await response.json(), itemSchema, path);
+}
+
+async function sendAuthed(
+	path: string,
+	accessToken: string,
+	init: { method: string; body?: string }
+): Promise<Response> {
+	const response = await fetch(`${BASE_URL}${path}`, {
+		method: init.method,
+		headers: {
+			Authorization: `Bearer ${accessToken}`,
+			...(init.body ? { 'Content-Type': 'application/json' } : {})
+		},
+		body: init.body
+	});
+	if (!response.ok) await fail(response, path);
+	return response;
+}
+
+// --- Mapper ----------------------------------------------------------------
+
+/**
+ * Questa traduzione esisteva in quattro copie identiche, una per ogni funzione
+ * che restituisce video. Ora e' una sola: un campo che cambia si corregge qui.
+ */
+function toVideo(item: ApiVideoItem, channel?: Channel): Video {
+	const { snippet, statistics } = item;
+	return {
+		id: item.id,
+		title: snippet.title,
+		desc: snippet.description,
+		thumbnails: {
+			default: snippet.thumbnails.default?.url ?? '',
+			medium: snippet.thumbnails.medium?.url ?? '',
+			high: snippet.thumbnails.high?.url ?? '',
+			standard: snippet.thumbnails.standard?.url,
+			maxres: snippet.thumbnails.maxres?.url
+		},
+		publishedAt: snippet.publishedAt,
+		channelId: snippet.channelId,
+		channelTitle: snippet.channelTitle,
+		channelSubscriberCount: channel?.statistics.subscriberCount,
+		channelSubscriberCountHidden: channel?.statistics.hiddenSubscriberCount,
+		avatarUrl: channel?.thumbnails.default?.url ?? '',
+		durationSeconds: parseIsoDuration(item.contentDetails?.duration),
+		statistics: {
+			viewCount: statistics?.viewCount ?? '0',
+			likeCount: statistics?.likeCount ?? '0',
+			commentCount: statistics?.commentCount ?? '0',
+			favoriteCount: statistics?.favoriteCount ?? '0'
+		}
+	};
+}
+
+function toChannel(item: ApiChannelItem): Channel {
+	return {
+		id: item.id,
+		title: item.snippet.title,
+		description: item.snippet.description,
+		customUrl: item.snippet.customUrl ?? '',
+		publishedAt: item.snippet.publishedAt,
+		thumbnails: item.snippet.thumbnails,
+		statistics: item.statistics,
+		...(item.brandingSettings?.image?.bannerExternalUrl
+			? {
+					brandingSettings: {
+						image: {
+							bannerExternalUrl: item.brandingSettings.image.bannerExternalUrl
+						}
+					}
+				}
+			: {})
+	};
+}
+
+function toPlaylist(item: ApiPlaylist): Playlist {
+	const { snippet } = item;
+	return {
+		id: item.id,
+		title: snippet.title,
+		description: snippet.description,
+		publishedAt: snippet.publishedAt,
+		thumbnail:
+			snippet.thumbnails.medium?.url ??
+			snippet.thumbnails.high?.url ??
+			snippet.thumbnails.default?.url ??
+			'',
+		itemCount: item.contentDetails?.itemCount
+	};
+}
+
+function toComment(comment: ApiComment) {
+	const { snippet } = comment;
+	return {
+		id: comment.id,
+		authorDisplayName: snippet.authorDisplayName,
+		authorChannelId: snippet.authorChannelId?.value ?? '',
+		authorChannelUrl: snippet.authorChannelUrl,
+		authorProfileImageUrl: snippet.authorProfileImageUrl,
+		textDisplay: snippet.textDisplay,
+		publishedAt: snippet.publishedAt,
+		likeCount: snippet.likeCount ?? 0
+	};
+}
+
+/** Prende i dettagli di piu' video in una sola richiesta, con i canali annessi. */
+async function hydrateVideos(videoIds: string[]): Promise<Video[]> {
+	if (videoIds.length === 0) return [];
+
+	const { items } = await getPublic(
+		`/videos?part=snippet,statistics,contentDetails&id=${videoIds.join(',')}`,
+		videoItemSchema
+	);
+	const channels = await getChannelsByIds([...new Set(items.map((i) => i.snippet.channelId))]);
+
+	return items.map((item) =>
+		toVideo(
+			item,
+			channels.find((c) => c.id === item.snippet.channelId)
+		)
+	);
+}
+
+// --- API pubblica ----------------------------------------------------------
+
+/** Video popolari (chart mostPopular, regione IT), eventualmente di una categoria. */
 export async function getVideos(
 	maxResults: number = 20,
-	pageToken?: string
+	pageToken?: string,
+	categoryId?: string
 ): Promise<{ videos: Video[]; nextPageToken?: string; prevPageToken?: string }> {
-	if (!PUBLIC_YOUTUBE_API_KEY) {
-		throw new Error('YouTube API key is not defined');
-	}
-	try {
-		let url = `${BASE_URL}/videos?part=snippet,statistics,contentDetails&chart=mostPopular&regionCode=IT&maxResults=${maxResults}&key=${PUBLIC_YOUTUBE_API_KEY}`;
-		if (pageToken) {
-			url += `&pageToken=${pageToken}`;
-		}
-		const response = await fetch(url);
-		if (!response.ok) {
-			throw new Error('Failed to fetch videos');
-		}
-		const data = await response.json();
-
-		const channelIds = data.items.map((item: any) => item.snippet.channelId).join(',');
-		const channels = await getChannelsByIds(channelIds);
-
-		const videos = data.items.map((item: any) => {
-			const channel = channels.find((c) => c.id === item.snippet.channelId);
-			return {
-				id: item.id,
-				title: item.snippet.title,
-				desc: item.snippet.description,
-				thumbnails: {
-					default: item.snippet.thumbnails.default?.url || '',
-					medium: item.snippet.thumbnails.medium?.url || '',
-					high: item.snippet.thumbnails.high?.url || '',
-					standard: item.snippet.thumbnails.standard?.url,
-					maxres: item.snippet.thumbnails.maxres?.url
-				},
-				publishedAt: item.snippet.publishedAt,
-				channelId: item.snippet.channelId,
-				channelTitle: item.snippet.channelTitle,
-				avatarUrl: channel?.thumbnails.default.url,
-				statistics: {
-					viewCount: item.statistics?.viewCount || '0',
-					likeCount: item.statistics?.likeCount || '0',
-					commentCount: item.statistics?.commentCount || '0',
-					favoriteCount: item.statistics?.favoriteCount || '0'
-				}
-			};
-		});
-
-		return {
-			videos: videos,
-			nextPageToken: data.nextPageToken,
-			prevPageToken: data.prevPageToken
-		};
-	} catch (error) {
-		console.error(error);
+	const list = await getPublic(
+		`/videos?part=snippet,statistics,contentDetails&chart=mostPopular&regionCode=IT&maxResults=${maxResults}` +
+			(categoryId ? `&videoCategoryId=${categoryId}` : '') +
+			(pageToken ? `&pageToken=${pageToken}` : ''),
+		videoItemSchema
+	).catch((error: unknown) => {
+		// Non tutte le categorie assegnabili hanno una classifica: in Italia
+		// 'Viaggi ed eventi' e 'Istruzione' rispondono 404 invece di restituire
+		// una lista vuota. Per chi guarda la chip e' comunque "nessun video".
+		if (categoryId && error instanceof YouTubeApiError && error.status === 404) return null;
 		throw error;
-	}
+	});
+
+	if (!list) return { videos: [] };
+	const { items, nextPageToken, prevPageToken } = list;
+
+	const channels = await getChannelsByIds([...new Set(items.map((i) => i.snippet.channelId))]);
+
+	return {
+		videos: items.map((item) =>
+			toVideo(
+				item,
+				channels.find((c) => c.id === item.snippet.channelId)
+			)
+		),
+		nextPageToken,
+		prevPageToken
+	};
 }
 
 /**
- * @param channelIds - A comma-separated string of channel IDs.
- * @returns A list of channels.
+ * Categorie per le chip della home. Costa 1 unita' e cambia una volta all'anno:
+ * la cache condivisa la rende gratis dopo la prima visita.
  */
-export async function getChannelsByIds(channelIds: string): Promise<Channel[]> {
-	if (!PUBLIC_YOUTUBE_API_KEY) {
-		throw new Error('YouTube API key is not defined');
-	}
-	try {
-		const response = await fetch(
-			`${BASE_URL}/channels?part=snippet,statistics&id=${channelIds}&key=${PUBLIC_YOUTUBE_API_KEY}`
-		);
-		if (!response.ok) {
-			throw new Error('Failed to fetch channels');
-		}
-		const data = await response.json();
-		return data.items.map((item: any) => ({
-			id: item.id,
-			title: item.snippet.title,
-			description: item.snippet.description,
-			customUrl: item.snippet.customUrl,
-			publishedAt: item.snippet.publishedAt,
-			thumbnails: item.snippet.thumbnails,
-			statistics: item.statistics
-		}));
-	} catch (error) {
-		console.error(error);
-		throw error;
-	}
+export async function getVideoCategories(): Promise<VideoCategory[]> {
+	const { items } = await getPublic(
+		'/videoCategories?part=snippet&regionCode=IT&hl=it',
+		videoCategoryItemSchema
+	);
+
+	return items
+		.filter((item) => item.snippet.assignable)
+		.map((item) => ({ id: item.id, title: item.snippet.title }));
 }
 
-/**
- * @param videoId - L'ID del video da recuperare.
- * @returns Un oggetto Video con i dettagli del video o null se non trovato.
- */
+export async function getChannelsByIds(channelIds: string[] | string): Promise<Channel[]> {
+	const ids = Array.isArray(channelIds) ? channelIds : channelIds.split(',').filter(Boolean);
+	if (ids.length === 0) return [];
+
+	const { items } = await getPublic(
+		`/channels?part=snippet,statistics&id=${ids.join(',')}`,
+		channelItemSchema
+	);
+	return items.map(toChannel);
+}
+
 export async function getVideoById(videoId: string): Promise<Video | null> {
-	if (!videoId) {
-		throw new Error('Video ID is required');
-	}
-	if (!PUBLIC_YOUTUBE_API_KEY) {
-		throw new Error('YouTube API key is not defined');
-	}
-	try {
-		const response = await fetch(
-			`${BASE_URL}/videos?part=snippet,statistics&id=${videoId}&key=${PUBLIC_YOUTUBE_API_KEY}`
-		);
-		if (!response.ok) {
-			throw new Error('Failed to fetch video');
-		}
-		const data = await response.json();
-		if (data.items.length === 0) {
-			return null;
-		}
+	if (!videoId) throw new YouTubeApiError('Video ID is required', 400);
 
-		const videoItem = data.items[0];
-		const channelId = videoItem.snippet.channelId;
-		const channels = await getChannelsByIds(channelId);
-		const channel = channels[0];
-
-		const video = {
-			id: videoItem.id,
-			title: videoItem.snippet.title,
-			desc: videoItem.snippet.description,
-			thumbnails: {
-				default: videoItem.snippet.thumbnails.default?.url || '',
-				medium: videoItem.snippet.thumbnails.medium?.url || '',
-				high: videoItem.snippet.thumbnails.high?.url || '',
-				standard: videoItem.snippet.thumbnails.standard?.url,
-				maxres: videoItem.snippet.thumbnails.maxres?.url
-			},
-			publishedAt: videoItem.snippet.publishedAt,
-			channelId: videoItem.snippet.channelId,
-			channelTitle: videoItem.snippet.channelTitle,
-			avatarUrl: channel?.thumbnails.default.url,
-			statistics: {
-				viewCount: videoItem.statistics?.viewCount || '0',
-				likeCount: videoItem.statistics?.likeCount || '0',
-				commentCount: videoItem.statistics?.commentCount || '0',
-				favoriteCount: videoItem.statistics?.favoriteCount || '0'
-			}
-		};
-
-		return video;
-	} catch (error) {
-		console.error(error);
-		throw error;
-	}
+	const [video] = await hydrateVideos([videoId]);
+	return video ?? null;
 }
 
 /**
- * Get comments for a specific video.
- * This function retrieves comments for a given video ID, including top-level comments and their replies.
- * @param videoId - L'ID del video per cui recuperare i commenti.
- * @param pageToken - Token di pagina opzionale per la paginazione dei risultati.
- * @returns Una lista di commenti per il video specificato.
+ * `textFormat=plainText` e' una misura di sicurezza, non una preferenza: senza,
+ * l'API restituisce HTML e i commenti finirebbero in un `{@html}`.
  */
 export async function getComments(
 	videoId: string,
 	pageToken?: string
-): Promise<{ comments: CommentThread[]; nextPageToken?: string }> {
-	if (!videoId) {
-		throw new Error('Video ID is required');
-	}
-	//Chiamata API per ottenere i commenti
-	if (!PUBLIC_YOUTUBE_API_KEY) {
-		throw new Error('YouTube API key is not defined');
-	}
+): Promise<{ comments: CommentThread[]; nextPageToken?: string; disabled?: boolean }> {
+	if (!videoId) throw new YouTubeApiError('Video ID is required', 400);
+
+	let page;
 	try {
-		const response = await fetch(
-			`${BASE_URL}/commentThreads?part=snippet,replies&videoId=${videoId}&key=${PUBLIC_YOUTUBE_API_KEY}${pageToken ? `&pageToken=${pageToken}` : ''}`
+		page = await getPublic(
+			`/commentThreads?part=snippet,replies&textFormat=plainText&videoId=${videoId}` +
+				(pageToken ? `&pageToken=${pageToken}` : ''),
+			commentThreadItemSchema,
+			// L'unica lista che l'utente puo' cambiare. Una copia in cache gli
+			// mostrerebbe il proprio commento appena scritto, modificato o
+			// eliminato come se non fosse successo niente, per cinque minuti.
+			// Costa 1 unita' di quota a visita: la stessa pagina ne spende gia' di
+			// piu' per il video e i correlati.
+			false
 		);
-		if (!response.ok) {
-			throw new Error('Failed to fetch comments');
+	} catch (cause) {
+		// Un video con i commenti disattivati risponde 403: e' uno stato del video,
+		// non un guasto, e la pagina lo dice invece di mostrare il JSON dell'errore.
+		if (cause instanceof YouTubeApiError && cause.reason === 'commentsDisabled') {
+			return { comments: [], disabled: true };
 		}
-		const data = await response.json();
-		const comments = data.items.map((item: any) => ({
-			//Parliamo di thread
-			id: item.id,
-			topLevelComment: {
-				id: item.snippet.topLevelComment.id,
-				authorDisplayName: item.snippet.topLevelComment.snippet.authorDisplayName,
-				authorChannelId: item.snippet.topLevelComment.snippet.authorChannelId.value,
-				authorChannelUrl: item.snippet.topLevelComment.snippet.authorChannelUrl,
-				authorProfileImageUrl: item.snippet.topLevelComment.snippet.authorProfileImageUrl,
-				textDisplay: item.snippet.topLevelComment.snippet.textDisplay,
-				publishedAt: item.snippet.topLevelComment.snippet.publishedAt,
-				likeCount: item.snippet.topLevelComment.snippet.likeCount || 0
-			},
-			replies: item.replies
-				? item.replies.comments.map((reply: any) => ({
-						id: reply.id,
-						authorDisplayName: reply.snippet.authorDisplayName,
-						authorChannelId: reply.snippet.authorChannelId.value,
-						authorChannelUrl: reply.snippet.authorChannelUrl,
-						authorProfileImageUrl: reply.snippet.authorProfileImageUrl,
-						textDisplay: reply.snippet.textDisplay,
-						publishedAt: reply.snippet.publishedAt,
-						likeCount: reply.snippet.likeCount || 0
-					}))
-				: []
-		}));
-		return {
-			comments: comments,
-			nextPageToken: data.nextPageToken
-		};
-	} catch (error) {
-		console.error(error);
-		throw error;
+		throw cause;
 	}
+	const { items, nextPageToken } = page;
+
+	return {
+		comments: items.map((item) => ({
+			id: item.id,
+			topLevelComment: toComment(item.snippet.topLevelComment),
+			replies: (item.replies?.comments ?? []).map(toComment)
+		})),
+		nextPageToken
+	};
+}
+
+/**
+ * `videoDuration` e' accettato solo insieme a `type=video`: senza, l'API
+ * risponde 400. Per questo i filtri sono validati alla porta e non lasciati
+ * passare cosi' come arrivano dalla query string.
+ */
+function searchParams(query: string, filters: SearchFilters, pageToken?: string) {
+	const params = new URLSearchParams({
+		part: 'snippet',
+		q: query,
+		type: filters.type,
+		maxResults: '20'
+	});
+	if (filters.order !== 'relevance') params.set('order', filters.order);
+	if (filters.type === 'video' && filters.duration !== 'any') {
+		params.set('videoDuration', filters.duration);
+	}
+	const publishedAfter = publishedAfterOf(filters.uploaded);
+	if (publishedAfter) params.set('publishedAfter', publishedAfter);
+	if (pageToken) params.set('pageToken', pageToken);
+	return params.toString();
+}
+
+const PERIOD_DAYS = { hour: 1 / 24, today: 1, week: 7, month: 30, year: 365 };
+
+/** L'API vuole un istante RFC 3339, l'interfaccia parla di 'questa settimana'. */
+function publishedAfterOf(uploaded: SearchFilters['uploaded']): string | undefined {
+	if (uploaded === 'any') return undefined;
+	return new Date(Date.now() - PERIOD_DAYS[uploaded] * 86400_000).toISOString();
 }
 
 export async function searchVideos(
 	query: string,
-	pageToken?: string
+	pageToken?: string,
+	filters: SearchFilters = defaultSearchFilters
 ): Promise<{ videos: Video[]; nextPageToken?: string }> {
-	if (!query) {
-		throw new Error('Query is required');
-	}
-	if (!PUBLIC_YOUTUBE_API_KEY) {
-		throw new Error('YouTube API key is not defined');
-	}
-	try {
-		let url = `${BASE_URL}/search?part=snippet&q=${query}&type=video&maxResults=20&key=${PUBLIC_YOUTUBE_API_KEY}`;
-		if (pageToken) {
-			url += `&pageToken=${pageToken}`;
-		}
-		const response = await fetch(url);
-		if (!response.ok) {
-			throw new Error('Failed to fetch videos');
-		}
-		const data = await response.json();
+	if (!query) throw new YouTubeApiError('Query is required', 400);
 
-		const videoIds = data.items.map((item: any) => item.id.videoId).join(',');
-		const videosResponse = await fetch(
-			`${BASE_URL}/videos?part=snippet,statistics,contentDetails&id=${videoIds}&key=${PUBLIC_YOUTUBE_API_KEY}`
-		);
-		if (!videosResponse.ok) {
-			throw new Error('Failed to fetch video details');
-		}
-		const videosData = await videosResponse.json();
+	const { items, nextPageToken } = await getPublic(
+		`/search?${searchParams(query, { ...filters, type: 'video' }, pageToken)}`,
+		searchItemSchema
+	);
 
-		const channelIds = videosData.items.map((item: any) => item.snippet.channelId).join(',');
-		const channels = await getChannelsByIds(channelIds);
-
-		const videos = videosData.items.map((item: any) => {
-			const channel = channels.find((c) => c.id === item.snippet.channelId);
-			return {
-				id: item.id,
-				title: item.snippet.title,
-				desc: item.snippet.description,
-				thumbnails: {
-					default: item.snippet.thumbnails.default?.url || '',
-					medium: item.snippet.thumbnails.medium?.url || '',
-					high: item.snippet.thumbnails.high?.url || '',
-					standard: item.snippet.thumbnails.standard?.url,
-					maxres: item.snippet.thumbnails.maxres?.url
-				},
-				publishedAt: item.snippet.publishedAt,
-				channelId: item.snippet.channelId,
-				channelTitle: item.snippet.channelTitle,
-				avatarUrl: channel?.thumbnails.default.url,
-				statistics: {
-					viewCount: item.statistics?.viewCount || '0',
-					likeCount: item.statistics?.likeCount || '0',
-					commentCount: item.statistics?.commentCount || '0',
-					favoriteCount: item.statistics?.favoriteCount || '0'
-				}
-			};
-		});
-
-		return {
-			videos: videos,
-			nextPageToken: data.nextPageToken
-		};
-	} catch (error) {
-		console.error(error);
-		throw error;
-	}
+	const ids = items.map((i) => i.id.videoId).filter((id): id is string => !!id);
+	return { videos: await hydrateVideos(ids), nextPageToken };
 }
 
 /**
- *
- * @param accessToken
- * @returns channel subscriptions for the authenticated user
+ * La ricerca per canali: `search.list` restituisce solo gli id, i dati veri
+ * (iscritti, banner) stanno su `channels.list` e vanno chiesti a parte, come
+ * gia' succede per i video.
  */
-export async function getSubscriptions(accessToken: string): Promise<Channel[]> {
-	if (!accessToken) {
-		throw new Error('Access token is required');
-	}
-	try {
-		const response = await fetch(`${BASE_URL}/subscriptions?part=snippet&mine=true&maxResults=50`, {
-			headers: {
-				Authorization: `Bearer ${accessToken}`
-			}
-		});
+export async function searchChannels(
+	query: string,
+	pageToken?: string,
+	filters: SearchFilters = defaultSearchFilters
+): Promise<{ channels: Channel[]; nextPageToken?: string }> {
+	if (!query) throw new YouTubeApiError('Query is required', 400);
 
-		if (!response.ok) {
-			const errorText = await response.text();
-			console.error('Failed to fetch subscriptions', response.status, errorText);
-			throw new Error(`Failed to fetch subscriptions: ${response.status}`);
-		}
+	const { items, nextPageToken } = await getPublic(
+		`/search?${searchParams(query, { ...filters, type: 'channel' }, pageToken)}`,
+		searchItemSchema
+	);
 
-		const data = await response.json();
-		if (!data.items || data.items.length === 0) {
-			return [];
-		}
-
-		const channelIds = data.items.map((item: any) => item.snippet.resourceId.channelId).join(',');
-
-		const channels = await getChannelsByIds(channelIds);
-		// Add subscriptionId to each channel
-		const subscriptions = data.items.map((item: any) => {
-			const channel = channels.find((c) => c.id === item.snippet.resourceId.channelId);
-			if (channel) {
-				channel.subscriptionId = item.id;
-			}
-			return channel;
-		});
-
-		return subscriptions.filter((c: Channel | undefined): c is Channel => !!c);
-	} catch (error) {
-		console.error(error);
-		throw error;
-	}
+	const ids = items.map((i) => i.id.channelId).filter((id): id is string => !!id);
+	return { channels: await getChannelsByIds(ids), nextPageToken };
 }
 
 /**
- *
- * @param subscriptionId id univoco della sottoscrizione da annullare
- * @param accessToken token di accesso dell'utente
+ * Una ricerca sola per chi la consuma: video e canali arrivano nella stessa
+ * forma, con l'array che non c'entra vuoto. Senza questo, ogni chiamante
+ * dovrebbe ramificare sul tipo e la pagina avrebbe due query invece di una.
  */
-export async function unsubscribeFromChannel(
-	subscriptionId: string,
-	accessToken: string
-): Promise<void> {
-	if (!subscriptionId) {
-		throw new Error('Subscription ID is required');
+export async function search(
+	query: string,
+	filters: SearchFilters,
+	pageToken?: string
+): Promise<{ videos: Video[]; channels: Channel[]; nextPageToken?: string }> {
+	if (filters.type === 'channel') {
+		const { channels, nextPageToken } = await searchChannels(query, pageToken, filters);
+		return { videos: [], channels, nextPageToken };
 	}
-	if (!accessToken) {
-		throw new Error('Access token is required');
-	}
-	try {
-		const response = await fetch(`${BASE_URL}/subscriptions?id=${subscriptionId}`, {
-			method: 'DELETE',
-			headers: {
-				Authorization: `Bearer ${accessToken}`
-			}
-		});
 
-		if (!response.ok) {
-			const errorText = await response.text();
-			console.error('Failed to unsubscribe from channel', response.status, errorText);
-			throw new Error(`Failed to unsubscribe from channel: ${response.status}`);
-		}
-	} catch (error) {
-		console.error(error);
-		throw error;
-	}
+	const { videos, nextPageToken } = await searchVideos(query, pageToken, filters);
+	return { videos, channels: [], nextPageToken };
 }
 
-/**
- * @param channelId - The ID of the channel to retrieve.
- * @returns A Channel object with the details of the channel or null if not found.
- */
 export async function getChannelById(channelId: string): Promise<Channel | null> {
-	if (!channelId) {
-		throw new Error('Channel ID is required');
-	}
-	if (!PUBLIC_YOUTUBE_API_KEY) {
-		throw new Error('YouTube API key is not defined');
-	}
-	try {
-		const response = await fetch(
-			`${BASE_URL}/channels?part=snippet,statistics,brandingSettings&id=${channelId}&key=${PUBLIC_YOUTUBE_API_KEY}`
-		);
-		if (!response.ok) {
-			throw new Error('Failed to fetch channel');
-		}
-		const data = await response.json();
-		if (data.items.length === 0) {
-			return null;
-		}
-		const item = data.items[0];
-		return {
-			id: item.id,
-			title: item.snippet.title,
-			description: item.snippet.description,
-			customUrl: item.snippet.customUrl,
-			publishedAt: item.snippet.publishedAt,
-			thumbnails: item.snippet.thumbnails,
-			statistics: item.statistics,
-			brandingSettings: {
-				image: {
-					bannerExternalUrl: item.brandingSettings.image?.bannerExternalUrl
-				}
-			}
-		};
-	} catch (error) {
-		console.error(error);
-		throw error;
-	}
+	if (!channelId) throw new YouTubeApiError('Channel ID is required', 400);
+
+	const { items } = await getPublic(
+		`/channels?part=snippet,statistics,brandingSettings&id=${channelId}`,
+		channelItemSchema
+	);
+	return items[0] ? toChannel(items[0]) : null;
 }
 
 export async function getVideosByChannelId(
 	channelId: string,
+	order: ChannelOrder = defaultChannelOrder,
 	pageToken?: string
 ): Promise<{ videos: Video[]; nextPageToken?: string }> {
-	if (!channelId) {
-		throw new Error('Channel ID is required');
-	}
-	if (!PUBLIC_YOUTUBE_API_KEY) {
-		throw new Error('YouTube API key is not defined');
-	}
-	try {
-		let url = `${BASE_URL}/search?part=snippet&channelId=${channelId}&type=video&maxResults=20&key=${PUBLIC_YOUTUBE_API_KEY}`;
-		if (pageToken) {
-			url += `&pageToken=${pageToken}`;
-		}
-		const response = await fetch(url);
-		if (!response.ok) {
-			throw new Error('Failed to fetch videos');
-		}
-		const data = await response.json();
+	if (!channelId) throw new YouTubeApiError('Channel ID is required', 400);
 
-		const videoIds = data.items.map((item: any) => item.id.videoId).join(',');
-		if (!videoIds) {
-			return {
-				videos: [],
-				nextPageToken: data.nextPageToken
-			};
-		}
-		const videosResponse = await fetch(
-			`${BASE_URL}/videos?part=snippet,statistics,contentDetails&id=${videoIds}&key=${PUBLIC_YOUTUBE_API_KEY}`
-		);
-		if (!videosResponse.ok) {
-			throw new Error('Failed to fetch video details');
-		}
-		const videosData = await videosResponse.json();
+	const { items, nextPageToken } = await getPublic(
+		`/search?part=snippet&channelId=${channelId}&type=video&maxResults=20&order=${order}` +
+			(pageToken ? `&pageToken=${pageToken}` : ''),
+		searchItemSchema
+	);
 
-		const channelIds = videosData.items.map((item: any) => item.snippet.channelId).join(',');
-		const channels = await getChannelsByIds(channelIds);
-
-		const videos = videosData.items.map((item: any) => {
-			const channel = channels.find((c) => c.id === item.snippet.channelId);
-			return {
-				id: item.id,
-				title: item.snippet.title,
-				desc: item.snippet.description,
-				thumbnails: {
-					default: item.snippet.thumbnails.default?.url || '',
-					medium: item.snippet.thumbnails.medium?.url || '',
-					high: item.snippet.thumbnails.high?.url || '',
-					standard: item.snippet.thumbnails.standard?.url,
-					maxres: item.snippet.thumbnails.maxres?.url
-				},
-				publishedAt: item.snippet.publishedAt,
-				channelId: item.snippet.channelId,
-				channelTitle: item.snippet.channelTitle,
-				avatarUrl: channel?.thumbnails.default.url,
-				statistics: {
-					viewCount: item.statistics?.viewCount || '0',
-					likeCount: item.statistics?.likeCount || '0',
-					commentCount: item.statistics?.commentCount || '0',
-					favoriteCount: item.statistics?.favoriteCount || '0'
-				}
-			};
-		});
-
-		return {
-			videos: videos,
-			nextPageToken: data.nextPageToken
-		};
-	} catch (error) {
-		console.error(error);
-		throw error;
-	}
+	const ids = items.map((i) => i.id.videoId).filter((id): id is string => !!id);
+	return { videos: await hydrateVideos(ids), nextPageToken };
 }
 
-/**
- *
- * @param subscriptionId id univoco della sottoscrizione da annullare
- * @param accessToken token di accesso dell'utente
- */
-export async function subscribeToChannel(
-	channelId: string,
+// --- Operazioni per conto dell'utente --------------------------------------
+
+export async function getSubscriptions(accessToken: string): Promise<Channel[]> {
+	if (!accessToken) throw new YouTubeApiError('Access token is required', 401);
+
+	const { items } = await getAuthed(
+		'/subscriptions?part=snippet&mine=true&maxResults=50',
+		accessToken,
+		subscriptionItemSchema
+	);
+	if (items.length === 0) return [];
+
+	const channels = await getChannelsByIds(items.map((i) => i.snippet.resourceId.channelId));
+
+	return items
+		.map((item): Channel | undefined => {
+			const channel = channels.find((c) => c.id === item.snippet.resourceId.channelId);
+			return channel ? { ...channel, subscriptionId: item.id } : undefined;
+		})
+		.filter((c): c is Channel => !!c);
+}
+
+export async function subscribeToChannel(channelId: string, accessToken: string): Promise<string> {
+	if (!channelId) throw new YouTubeApiError('Channel ID is required', 400);
+	if (!accessToken) throw new YouTubeApiError('Access token is required', 401);
+
+	const response = await sendAuthed('/subscriptions?part=snippet', accessToken, {
+		method: 'POST',
+		body: JSON.stringify({ snippet: { resourceId: { kind: 'youtube#channel', channelId } } })
+	});
+	const data = (await response.json()) as { id?: string };
+	if (!data.id) throw new YouTubeApiError('Iscrizione creata senza id', 502);
+	return data.id;
+}
+
+export async function unsubscribeFromChannel(
+	subscriptionId: string,
 	accessToken: string
-): Promise<string | undefined> {
-	if (!channelId) {
-		throw new Error('Channel ID is required');
-	}
-	if (!accessToken) {
-		throw new Error('Access token is required');
-	}
-	try {
-		const response = await fetch(`${BASE_URL}/subscriptions?part=snippet`, {
-			method: 'POST',
-			headers: {
-				Authorization: `Bearer ${accessToken}`,
-				'Content-Type': 'application/json'
-			},
-			body: JSON.stringify({
-				snippet: {
-					resourceId: {
-						kind: 'youtube#channel',
-						channelId: channelId
-					}
-				}
-			})
-		});
+): Promise<boolean> {
+	if (!subscriptionId) throw new YouTubeApiError('Subscription ID is required', 400);
+	if (!accessToken) throw new YouTubeApiError('Access token is required', 401);
 
-		if (!response.ok) {
-			const errorText = await response.text();
-			console.error('Failed to subscribe to channel', response.status, errorText);
-			throw new Error(`Failed to subscribe to channel: ${response.status}`);
-		}
-
-		const data = await response.json();
-		return data.id;
-	} catch (error) {
-		console.error(error);
-		throw error;
-	}
+	await sendAuthed(`/subscriptions?id=${subscriptionId}`, accessToken, { method: 'DELETE' });
+	return true;
 }
-/**
- *
- * @param videoId ID del video da valutare
- * @param rating Valutazione da assegnare (like, dislike, none)
- * @param accessToken Token di accesso dell'utente
- * @returns true se la valutazione è stata inviata con successo
- */
+
 export async function rateVideo(
 	videoId: string,
 	rating: 'like' | 'dislike' | 'none',
 	accessToken: string
 ): Promise<boolean> {
-	if (!videoId) {
-		throw new Error('Video ID is required');
-	}
-	if (!accessToken) {
-		throw new Error('Access token is required');
-	}
-	try {
-		const response = await fetch(`${BASE_URL}/videos/rate?id=${videoId}&rating=${rating}`, {
-			method: 'POST',
-			headers: {
-				Authorization: `Bearer ${accessToken}`,
-				'Content-Type': 'application/json'
-			}
-		});
+	if (!videoId) throw new YouTubeApiError('Video ID is required', 400);
+	if (!accessToken) throw new YouTubeApiError('Access token is required', 401);
 
-		if (response.status === 204) {
-			return true;
-		}
-
-		const errorText = await response.text();
-		console.error('Failed to rate video', response.status, errorText);
-		throw new Error(`Failed to rate video: ${response.status}`);
-	} catch (error) {
-		console.error(error);
-		throw error;
-	}
+	await sendAuthed(`/videos/rate?id=${encodeURIComponent(videoId)}&rating=${rating}`, accessToken, {
+		method: 'POST'
+	});
+	return true;
 }
 
-//https://www.googleapis.com/youtube/v3/channels?part=contentDetails&mine=true&key={YOUR_API_KEY}
+/**
+ * Pubblica un commento vero sotto il video.
+ *
+ * `channelId` e' il canale che ha caricato il video, non quello di chi scrive.
+ * Costa 50 unita' di quota contro le 1-3 di una lista: sono circa 200 commenti
+ * al giorno prima di esaurire il budget, quindi vale la pena saperlo.
+ */
+export async function postComment(
+	videoId: string,
+	channelId: string,
+	text: string,
+	accessToken: string
+): Promise<void> {
+	if (!videoId || !channelId) throw new YouTubeApiError('Video e canale sono richiesti', 400);
+	if (!text.trim()) throw new YouTubeApiError("Il commento e' vuoto", 400);
+	if (!accessToken) throw new YouTubeApiError('Access token is required', 401);
 
-//https://www.googleapis.com/youtube/v3/playlistItems?part=contentDetails,snippet&playlistId=LL&key={YOUR_API_KEY}
-export async function getLikedVideos(accessToken: string): Promise<{ videos: Video[] }> {
-	if (!accessToken) {
-		throw new Error('Access token is required');
-	}
-	try {
-		const response = await fetch(
-			`https://www.googleapis.com/youtube/v3/playlistItems?part=contentDetails,snippet&maxResults=20&playlistId=LL&key={YOUR_API_KEY}`,
-			{
-				headers: {
-					Authorization: `Bearer ${accessToken}`
-				}
+	await sendAuthed('/commentThreads?part=snippet', accessToken, {
+		method: 'POST',
+		body: JSON.stringify({
+			snippet: {
+				channelId,
+				videoId,
+				topLevelComment: { snippet: { textOriginal: text } }
 			}
-		);
+		})
+	});
+}
 
-		if (!response.ok) {
-			const errorText = await response.text();
-			console.error('Failed to fetch liked videos', response.status, errorText);
-			throw new Error(`Failed to fetch liked videos: ${response.status}`);
-		}
+/**
+ * Risponde a un commento. La Data API accetta come `parentId` solo il commento
+ * in cima al thread: rispondere a una risposta appende in fondo allo stesso
+ * thread e non apre un terzo livello, che YouTube non ha.
+ *
+ * Costa 50 unita' come la pubblicazione.
+ */
+export async function replyToComment(
+	parentId: string,
+	text: string,
+	accessToken: string
+): Promise<void> {
+	if (!parentId) throw new YouTubeApiError('Parent ID is required', 400);
+	if (!text.trim()) throw new YouTubeApiError("Il commento e' vuoto", 400);
+	if (!accessToken) throw new YouTubeApiError('Access token is required', 401);
 
-		const data = await response.json();
+	await sendAuthed('/comments?part=snippet', accessToken, {
+		method: 'POST',
+		body: JSON.stringify({ snippet: { parentId, textOriginal: text } })
+	});
+}
 
-		return {
-			videos: data.items.map((item: any) => {
-				return {
-					id: item.contentDetails.videoId,
-					channelId: item.snippet.videoOwnerChannelId,
-					channelTitle: item.snippet.videoOwnerChannelTitle,
-					title: item.snippet.title,
-					thumbnail: item.snippet.thumbnails.default.url
-				};
-			})
-		};
-	} catch (error) {
-		console.error(error);
-		throw error;
-	}
+/**
+ * Gli elementi di una playlist arrivano come soli id: i dettagli si prendono in
+ * una richiesta sola. Prima questa funzione dichiarava di restituire `Video[]`
+ * ma costruiva a mano oggetti con meta' dei campi e `thumbnail` al singolare;
+ * l'`any` sul mapper lo rendeva invisibile al compilatore.
+ *
+ * Passa dal token e non dalla API key perche' le playlist dell'utente possono
+ * essere private, e 'LL' (i piaciuti) lo e' sempre.
+ */
+export async function getPlaylistVideos(
+	playlistId: string,
+	accessToken: string,
+	pageToken?: string
+): Promise<{ videos: Video[]; nextPageToken?: string }> {
+	if (!playlistId) throw new YouTubeApiError('Playlist ID is required', 400);
+	if (!accessToken) throw new YouTubeApiError('Access token is required', 401);
+
+	const { items, nextPageToken } = await getAuthed(
+		`/playlistItems?part=contentDetails&maxResults=20&playlistId=${playlistId}` +
+			(pageToken ? `&pageToken=${pageToken}` : ''),
+		accessToken,
+		playlistItemSchema
+	);
+
+	return {
+		videos: await hydrateVideos(items.map((i) => i.contentDetails.videoId)),
+		nextPageToken
+	};
+}
+
+/** 'LL' e' l'id della playlist dei piaciuti, uguale per ogni account. */
+export async function getLikedVideos(accessToken: string): Promise<{ videos: Video[] }> {
+	return getPlaylistVideos('LL', accessToken);
+}
+
+/**
+ * Una playlist sola, per intestare la sua pagina. Passa dal token perche' una
+ * playlist privata non e' leggibile con la sola API key.
+ */
+export async function getPlaylistById(
+	playlistId: string,
+	accessToken: string
+): Promise<Playlist | null> {
+	if (!playlistId) throw new YouTubeApiError('Playlist ID is required', 400);
+	if (!accessToken) throw new YouTubeApiError('Access token is required', 401);
+
+	const { items } = await getAuthed(
+		`/playlists?part=snippet,contentDetails&id=${playlistId}`,
+		accessToken,
+		playlistSchema
+	);
+	return items[0] ? toPlaylist(items[0]) : null;
+}
+
+/** Le playlist create dall'utente, quelle di sistema escluse dall'API stessa. */
+export async function getMyPlaylists(accessToken: string): Promise<Playlist[]> {
+	if (!accessToken) throw new YouTubeApiError('Access token is required', 401);
+
+	const { items } = await getAuthed(
+		'/playlists?part=snippet,contentDetails&mine=true&maxResults=50',
+		accessToken,
+		playlistSchema
+	);
+	return items.map(toPlaylist);
+}
+
+/**
+ * Il canale di chi e' loggato, che serve per sapere quali commenti sono suoi.
+ * Un account Google senza canale YouTube non ne ha uno: in quel caso l'API
+ * risponde con una lista vuota, non con un errore.
+ */
+export async function getMyChannelId(accessToken: string): Promise<string | null> {
+	if (!accessToken) throw new YouTubeApiError('Access token is required', 401);
+
+	const { items } = await getAuthed('/channels?part=id&mine=true', accessToken, channelIdSchema);
+	return items[0]?.id ?? null;
+}
+
+/** Il voto di chi e' loggato a un video: un voto assente o sconosciuto e' 'none'. */
+export async function getMyRating(
+	videoId: string,
+	accessToken: string
+): Promise<'like' | 'dislike' | 'none'> {
+	if (!accessToken) throw new YouTubeApiError('Access token is required', 401);
+
+	const { items } = await getAuthed(
+		`/videos/getRating?id=${encodeURIComponent(videoId)}`,
+		accessToken,
+		ratingItemSchema
+	);
+	const rating = items[0]?.rating;
+	return rating === 'like' || rating === 'dislike' ? rating : 'none';
+}
+
+/** L'id dell'iscrizione di chi e' loggato a un canale, o null se non e' iscritto. */
+export async function getMySubscriptionId(
+	channelId: string,
+	accessToken: string
+): Promise<string | null> {
+	if (!accessToken) throw new YouTubeApiError('Access token is required', 401);
+
+	const { items } = await getAuthed(
+		`/subscriptions?part=id&forChannelId=${encodeURIComponent(channelId)}&mine=true`,
+		accessToken,
+		subscriptionIdSchema
+	);
+	return items[0]?.id ?? null;
+}
+
+/**
+ * Modifica e cancellazione valgono solo sui propri commenti: e' YouTube a
+ * rifiutare gli altri con un 403, quindi il controllo lato interfaccia serve a
+ * non mostrare bottoni che non funzionerebbero, non come misura di sicurezza.
+ *
+ * Costano 50 unita' l'una, come la pubblicazione.
+ */
+export async function updateComment(
+	commentId: string,
+	text: string,
+	accessToken: string
+): Promise<void> {
+	if (!commentId) throw new YouTubeApiError('Comment ID is required', 400);
+	if (!text.trim()) throw new YouTubeApiError("Il commento e' vuoto", 400);
+	if (!accessToken) throw new YouTubeApiError('Access token is required', 401);
+
+	await sendAuthed('/comments?part=snippet', accessToken, {
+		method: 'PUT',
+		body: JSON.stringify({ id: commentId, snippet: { textOriginal: text } })
+	});
+}
+
+export async function deleteComment(commentId: string, accessToken: string): Promise<void> {
+	if (!commentId) throw new YouTubeApiError('Comment ID is required', 400);
+	if (!accessToken) throw new YouTubeApiError('Access token is required', 401);
+
+	await sendAuthed(`/comments?id=${commentId}`, accessToken, { method: 'DELETE' });
 }

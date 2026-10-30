@@ -1,12 +1,7 @@
 <script lang="ts">
-	import { formatSubscriberCount, formatTimeAgo } from '$lib/scripts/scripts';
-	import { onMount } from 'svelte';
+	import { formatSubscriberCount, formatTimeAgo } from '#lib/scripts/scripts.js';
 	let { data } = $props();
-	let baseUrl = 'https://www.youtube.com/';
-	let src = $state<string | undefined>(undefined);
-	onMount(() => {
-		src = baseUrl + data.channel.customUrl;
-	});
+	const src = $derived(`https://www.youtube.com/${data.channel.customUrl}`);
 </script>
 
 <div class="p-4">
@@ -14,6 +9,7 @@
 	<p class="text-secondary">{data.channel.description}</p>
 	<div class="text-primary mt-4">
 		<h2 class="text-lg font-semibold">Channel Details</h2>
+		<!-- eslint-disable-next-line svelte/no-navigation-without-resolve -- URL esterno del canale, non una rotta dell'app -->
 		<a href={src} target="_blank" rel="noopener noreferrer">
 			<p class="font-bold hover:text-blue-400">{src}</p>
 		</a>

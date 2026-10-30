@@ -1,55 +1,23 @@
 <script lang="ts">
-	import VideoPlayer from '$lib/components/videoPlayer.svelte';
-	import CommentsCard from '$lib/components/CommentsCard.svelte';
-	import RecommendedVideos from '$lib/components/RecommendedVideos.svelte';
+	import { createInfiniteQuery } from '@tanstack/svelte-query';
+	import VideoPlayer from '#lib/components/videoPlayer.svelte';
+	import CommentsCard from '#lib/components/CommentsCard.svelte';
+	import RecommendedVideos from '#lib/components/RecommendedVideos.svelte';
+	import SkeletonRecommended from '#lib/components/SkeletonRecommended.svelte';
+	import SkeletonPlayer from '#lib/components/SkeletonPlayer.svelte';
 	import { fly } from 'svelte/transition';
-	import SkeletonRecommended from '$lib/components/SkeletonRecommended.svelte';
-	import SkeletonPlayer from '$lib/components/SkeletonPlayer.svelte';
-	import type { Video } from '$lib/api/mock.js';
 	import { inview } from 'svelte-inview';
+	import { relatedVideosOptions } from '#lib/queries.js';
 
 	let { data } = $props();
-	let videos = $state<Video[]>([]);
-	let nextPageToken: string | undefined = $state(undefined);
-	let isLoaded = $state(false);
-	let error = $state<string | null>(null);
 
-	async function loadMoreVideos() {
-		if (!nextPageToken) return;
+	// La chiave include il videoId: cambiando video la lista riparte da sola,
+	// senza il reset manuale dello stato che serviva prima.
+	const related = createInfiniteQuery(() =>
+		relatedVideosOptions(data.videoId, data.relatedFirstPage)
+	);
 
-		const response = await fetch(`/api/videos?pageToken=${nextPageToken}`);
-		const newVideosData = await response.json();
-
-		videos = [...videos, ...newVideosData.videos];
-		nextPageToken = newVideosData.nextPageToken;
-	}
-
-	// Initialize data when promises resolve or when video changes
-	$effect(() => {
-		// Reset state when video changes
-		isLoaded = false;
-		videos = [];
-		nextPageToken = undefined;
-		error = null;
-
-		data.relatedVideos
-			.then((awaitedVideos) => {
-				videos = awaitedVideos;
-				isLoaded = true;
-			})
-			.catch((err) => {
-				error = err?.message || err;
-				isLoaded = true;
-			});
-
-		data.nextPageToken
-			.then((token) => {
-				nextPageToken = token;
-			})
-			.catch(() => {
-				// Handle token error silently
-			});
-	});
+	const videos = $derived(related.data?.pages.flatMap((p) => p.videos) ?? []);
 </script>
 
 <main class="w-full p-4 xl:p-8">
@@ -58,7 +26,7 @@
 			{#await data.video}
 				<SkeletonPlayer />
 			{:then video}
-				<VideoPlayer {video} />
+				<VideoPlayer {video} user={data.user} />
 			{:catch error}
 				<p>Error loading video: {error.message}</p>
 			{/await}
@@ -67,26 +35,28 @@
 		<div
 			class="w-full gap-4 sm:grid sm:grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:col-start-2 xl:row-span-2 xl:row-start-1 xl:flex xl:w-110 xl:flex-col"
 		>
-			{#if error}
+			{#if related.isError}
 				<p>
-					<strong class="text-primary">Errore nel caricamento dei video: {error}</strong>
+					<strong class="text-primary">
+						Errore nel caricamento dei video: {related.error.message}
+					</strong>
 				</p>
-			{:else if !isLoaded}
-				{#each Array(9)}
+			{:else if related.isPending}
+				{#each Array(9), i (i)}
 					<SkeletonRecommended />
 				{/each}
 			{:else}
-				{#each videos as video, index (video.id)}
+				{#each videos as video (video.id)}
 					<div in:fly|local={{ x: 50, duration: 200 }}>
 						<RecommendedVideos {video}></RecommendedVideos>
 					</div>
 				{/each}
-				{#if nextPageToken}
+				{#if related.hasNextPage}
 					<!-- Infinite scroll per schermi grandi -->
 					<div
 						class="hidden xl:block"
 						use:inview={{ threshold: 0.1 }}
-						oninview_enter={loadMoreVideos}
+						oninview_enter={() => related.fetchNextPage()}
 					>
 						<SkeletonRecommended />
 					</div>
@@ -96,15 +66,14 @@
 		<div class="xl:hidden">
 			<button
 				class="bg-background-secondary hover:bg-background-tertiary/90 text-primary w-full cursor-pointer rounded-lg px-4 py-3 font-bold transition-colors"
-				onclick={loadMoreVideos}
+				onclick={() => related.fetchNextPage()}
 			>
 				Carica altri video
 			</button>
 		</div>
 
 		<div class="w-full xl:col-start-1 xl:row-start-2 xl:min-h-0">
-			<CommentsCard comments={data.comments} commentsNextPageToken={data.commentsNextPageToken}
-			></CommentsCard>
+			<CommentsCard videoId={data.videoId} firstPage={data.commentsFirstPage} user={data.user} />
 		</div>
 	</div>
 </main>

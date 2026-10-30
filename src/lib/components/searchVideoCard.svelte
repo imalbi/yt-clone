@@ -1,42 +1,59 @@
 <script lang="ts">
-	import type { Video } from '$lib/api/mock';
+	import { resolve } from '$app/paths';
+	import type { Video } from '#lib/types/video.js';
+	import { formatTimeAgo, formatSubscriberCount } from '#lib/scripts/scripts.js';
+	import DurationBadge from './DurationBadge.svelte';
+
 	let { video }: { video: Video } = $props();
-	import { formatTimeAgo } from '$lib/scripts/scripts';
-	import { formatSubscriberCount } from '$lib/scripts/scripts';
 </script>
 
-<a href="/video/{video.id}" class="block">
-	<article
-		class=" text-primary bg-background-primary flex cursor-pointer flex-col gap-4 rounded-lg p-2 sm:flex-row"
+<article
+	class="text-primary hover:bg-background-secondary group flex cursor-pointer flex-col gap-4 rounded-2xl p-2.5 transition-colors sm:flex-row"
+>
+	<a
+		href={resolve('/video/[videoId]', { videoId: video.id })}
+		class="bg-background-secondary relative block aspect-video w-full flex-shrink-0 overflow-hidden rounded-xl sm:w-64"
 	>
-		<div class="aspect-video w-full flex-shrink-0 sm:w-56">
-			<img
-				loading="lazy"
-				class="w-full rounded-md object-cover"
-				src={video.thumbnails.maxres ??
-					video.thumbnails.high ??
-					video.thumbnails.medium ??
-					video.thumbnails.default ??
-					video.thumbnails.standard}
-				alt="Thumbnail per {video.title}"
-			/>
-		</div>
+		<img
+			loading="lazy"
+			class="h-full w-full object-cover transition-transform duration-300 ease-out group-hover:scale-105"
+			src={video.thumbnails.maxres ??
+				video.thumbnails.high ??
+				video.thumbnails.medium ??
+				video.thumbnails.standard ??
+				video.thumbnails.default}
+			alt="Thumbnail per {video.title}"
+		/>
+		<DurationBadge seconds={video.durationSeconds} />
+	</a>
 
-		<div class="flex min-w-0 flex-1 flex-col">
-			<h3 class="line-clamp-1 text-lg font-bold">{video.title}</h3>
+	<div class="flex min-w-0 flex-1 flex-col py-1">
+		<a href={resolve('/video/[videoId]', { videoId: video.id })} class="block">
+			<h2
+				class="text-primary line-clamp-2 text-base leading-snug font-semibold [overflow-wrap:anywhere]"
+			>
+				{video.title}
+			</h2>
+		</a>
 
-			<div class="text-secondary mt-1 text-sm">
-				<p>{video.channelTitle}</p>
-				<p>
-					<span>{formatSubscriberCount(video.statistics.viewCount)} visualizzazioni</span>
-					<span class="mx-1">•</span>
-					<span>{formatTimeAgo(video.publishedAt)}</span>
-				</p>
-			</div>
-
-			<p class="text-secondary mt-2 hidden text-sm md:line-clamp-2">
-				{video.desc}
+		<div class="text-secondary mt-2 text-xs">
+			<a
+				href={resolve('/channel/[channelId]', { channelId: video.channelId })}
+				class="hover:text-primary inline-block font-medium transition-colors"
+			>
+				{video.channelTitle}
+			</a>
+			<p class="mt-0.5">
+				<span>{formatSubscriberCount(video.statistics.viewCount)} visualizzazioni</span>
+				<span class="mx-1">•</span>
+				<span>{formatTimeAgo(video.publishedAt)}</span>
 			</p>
 		</div>
-	</article>
-</a>
+
+		{#if video.desc}
+			<p class="text-secondary mt-2 hidden text-xs [overflow-wrap:anywhere] md:line-clamp-2">
+				{video.desc}
+			</p>
+		{/if}
+	</div>
+</article>

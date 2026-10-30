@@ -1,137 +1,76 @@
 <script lang="ts">
+	import { createInfiniteQuery, useQueryClient } from '@tanstack/svelte-query';
 	import CommentCard from './commentCard.svelte';
-	import type { CommentThread } from '$lib/types/commentThread';
-	import CommentReply from '$lib/components/CommentReply.svelte';
 	import { inview } from 'svelte-inview';
-	import { page } from '$app/state';
-	import { comments as commentsStore } from '$lib/stores/commentsStore';
-	import { userStore } from '$lib/stores/userStore';
-	import { afterNavigate } from '$app/navigation';
-	import { onDestroy } from 'svelte';
+	import { commentsOptions, queryKeys } from '#lib/queries.js';
+	import { myChannelId, postComment } from '#lib/youtube.remote.js';
+	import type { CommentThread } from '#lib/types/commentThread.js';
+	import type { User } from '#lib/types/user.js';
+
 	let {
-		comments,
-		commentsNextPageToken
+		videoId,
+		firstPage,
+		user
 	}: {
-		comments: Promise<CommentThread[]>;
-		commentsNextPageToken: Promise<string | undefined>;
+		videoId: string;
+		firstPage: Promise<{ comments: CommentThread[]; nextPageToken?: string; disabled?: boolean }>;
+		user: User;
 	} = $props();
 
-	// Subscribe to the store for this video ID
-	let allComments = $state<CommentThread[]>([]);
-	let nextPageToken = $state<string | undefined>(undefined);
-	let isLoaded = $state(false);
 	let newComment = $state('');
 	let show = $state(false);
 
-	// Create a store subscription that updates allComments when the store changes
-	const unsubscribe = commentsStore.subscribe((store) => {
-		if (page.params.videoId) {
-			const storeComments = store[page.params.videoId] || [];
-			allComments = storeComments; // aggiorna SEMPRE
-		}
-	});
+	const client = useQueryClient();
+	const thread = createInfiniteQuery(() => commentsOptions(videoId, firstPage));
 
-	// Cleanup the subscription when the component is destroyed
-	onDestroy(unsubscribe);
+	// Chiesto una volta per pagina e condiviso con ogni commento: e' cio' che
+	// distingue i propri commenti, quelli che si possono modificare.
+	const me = $derived(user ? myChannelId() : undefined);
+	const myId = $derived(me?.current ?? null);
 
-	// Combine promises for loading
-	//const dataPromise = Promise.all([comments, video]);
+	const allComments = $derived(thread.data?.pages.flatMap((p) => p.comments) ?? []);
 
-	// Add a new comment
-	async function addComment() {
-		if (newComment.trim() === '') return;
-		if (!$userStore) {
-			alert('Devi essere loggato per aggiungere un commento.');
+	// Il commento viene pubblicato davvero su YouTube. Prima restava in
+	// localStorage e non lo vedeva nessun altro: era una feature finta.
+	async function publish() {
+		try {
+			await postComment({ videoId, text: newComment });
+		} catch (cause) {
+			// Non c'e' un posto dove mostrarlo, come prima. Almeno il testo scritto
+			// non sparisce e non resta un rejection non gestito.
+			console.error('Pubblicazione del commento fallita:', cause);
 			return;
 		}
-
-		const commentData: CommentThread = {
-			id: crypto.randomUUID(),
-			topLevelComment: {
-				id: crypto.randomUUID(),
-				textDisplay: newComment,
-				publishedAt: new Date().toISOString(),
-				authorChannelId: '',
-				authorChannelUrl: '',
-				authorDisplayName: $userStore?.name || 'Tu',
-				authorProfileImageUrl: $userStore?.picture || '',
-				likeCount: 0
-			},
-			replies: []
-		};
-
-		// Add to store (will trigger subscription update)
-		commentsStore.addComment(page.params.videoId, commentData);
-
 		newComment = '';
 		show = false;
+		// La lista e' paginata, quindi resta su TanStack.
+		client.invalidateQueries({ queryKey: queryKeys.comments(videoId) });
 	}
-
-	// Load more comments
-	async function loadMoreComments() {
-		if (!nextPageToken) return;
-
-		try {
-			const response = await fetch(
-				`/api/comments?videoId=${page.params.videoId}&pageToken=${nextPageToken}`
-			);
-			const newCommentsData = await response.json();
-
-			// Add the new comments to the store
-			const added = commentsStore.addApiComments(page.params.videoId, newCommentsData.comments);
-
-			nextPageToken = newCommentsData.nextPageToken;
-			if (added === 0) {
-				loadMoreComments();
-			} // If no new comments, try loading more
-		} catch (error) {
-			console.error('Error loading more comments:', error);
-		}
-	}
-
-	// Initialize comments on navigation
-	afterNavigate(() => {
-		console.log('Navigated to a new video, resetting comments state');
-		isLoaded = false;
-		nextPageToken = undefined;
-		allComments = [];
-
-		(async () => {
-			try {
-				const [initialComments, token] = await Promise.all([comments, commentsNextPageToken]);
-				commentsStore.addApiComments(page.params.videoId, initialComments);
-				nextPageToken = token;
-			} catch (error) {
-				console.error('Error loading comments:', error);
-			} finally {
-				isLoaded = true;
-			}
-		})();
-	});
 </script>
 
 <div class="bg-background-secondary text-primary m-auto mt-10 flex flex-col gap-3 rounded-2xl p-4">
-	{#await comments}
+	{#if thread.isError}
+		<p class="text-red-500">Errore nel caricamento dei commenti: {thread.error.message}</p>
+	{:else if thread.isPending}
 		<p class="text-secondary">Caricamento dei commenti ...</p>
-	{:then}
-		<h1 class="text-primary mb-2 p-2 font-bold">
-			{isLoaded ? allComments.length : 0} commenti
-		</h1>
+	{:else if thread.data?.pages[0]?.disabled}
+		<p class="text-secondary">I commenti sono disattivati per questo video.</p>
+	{:else}
+		<h1 class="text-primary mb-2 p-2 font-bold">{allComments.length} commenti</h1>
 
 		<form>
 			<textarea
 				class="w-full"
 				onfocus={() => (show = true)}
 				bind:value={newComment}
-				placeholder="Aggiungi un commento (LocalStorage)"
-			></textarea>
+				placeholder={user ? 'Aggiungi un commento' : 'Accedi per commentare'}
+				disabled={!user || postComment.pending > 0}></textarea>
 			{#if show}
 				<div class="mr-4 flex justify-end gap-3">
 					<button
 						type="button"
 						class="bg-background-secondary text-primary cursor-pointer rounded-2xl p-2"
-						onclick={(e) => {
-							e.preventDefault();
+						onclick={() => {
 							newComment = '';
 							show = false;
 						}}>Annulla</button
@@ -142,47 +81,45 @@
 							type="submit"
 							onclick={(e) => {
 								e.preventDefault();
-								addComment();
+								publish();
 							}}
 						>
 							Commenta
 						</button>
 					{:else}
-						<div
-							class="bg-background-tertiary text-primary/60 rounded-2xl p-2"
-							tabindex="-1"
-							role="button"
-							onmousedown={(e) => {
-								e.preventDefault();
-								e.stopPropagation();
-							}}
-						>
-							Commenta
-						</div>
+						<div class="bg-background-tertiary text-primary/60 rounded-2xl p-2">Commenta</div>
 					{/if}
 				</div>
 			{/if}
 		</form>
-		<!-- Mostra i commenti (prima quelli iniziali, poi quelli caricati dinamicamente) -->
+
 		{#each allComments as comment (comment.id)}
-			<CommentCard commentData={comment.topLevelComment} threadId={comment.id}></CommentCard>
-			{#if comment.replies && comment.replies.length > 0}
+			<CommentCard
+				commentData={comment.topLevelComment}
+				{videoId}
+				parentId={comment.topLevelComment.id}
+				myChannelId={myId}
+			/>
+			{#if comment.replies.length > 0}
 				<div class="ml-4">
 					<p class="text-secondary">Risposte:</p>
 				</div>
 			{/if}
 			{#each comment.replies as reply (reply.id)}
-				<CommentReply commentData={reply}></CommentReply>
+				<CommentCard
+					commentData={reply}
+					{videoId}
+					parentId={comment.topLevelComment.id}
+					myChannelId={myId}
+					isReply
+				/>
 			{/each}
 		{/each}
 
-		<!-- Infinite scroll trigger -->
-		{#if nextPageToken}
-			<div use:inview={{ threshold: 0.1 }} oninview_enter={loadMoreComments}>
+		{#if thread.hasNextPage}
+			<div use:inview={{ threshold: 0.1 }} oninview_enter={() => thread.fetchNextPage()}>
 				<p class="text-secondary text-center">Caricamento commenti...</p>
 			</div>
 		{/if}
-	{:catch error}
-		<p class="text-red-500">Errore nel caricamento: {error?.message || error}</p>
-	{/await}
+	{/if}
 </div>

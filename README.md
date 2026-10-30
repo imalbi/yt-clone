@@ -1,117 +1,135 @@
-# YT-Clone con SvelteKit
+# yt-clone
 
-![Svelte](https://img.shields.io/badge/Svelte-FF3E00?style=for-the-badge&logo=svelte&logoColor=white)
-![Tailwind CSS](https://img.shields.io/badge/Tailwind_CSS-38B2AC?style=for-the-badge&logo=tailwind-css&logoColor=white)
-![TypeScript](https://img.shields.io/badge/TypeScript-007ACC?style=for-the-badge&logo=typescript&logoColor=white)
-![Vite](https://img.shields.io/badge/Vite-646CFF?style=for-the-badge&logo=vite&logoColor=white)
-![Vercel](https://img.shields.io/badge/Vercel-000000?style=for-the-badge&logo=vercel&logoColor=white)
+Un clone dell'interfaccia di YouTube costruito con SvelteKit e la YouTube Data API v3.
+
+![Svelte](https://img.shields.io/badge/Svelte%205-FF3E00?style=for-the-badge&logo=svelte&logoColor=white)
+![TypeScript](https://img.shields.io/badge/TypeScript%206-007ACC?style=for-the-badge&logo=typescript&logoColor=white)
+![Tailwind CSS](https://img.shields.io/badge/Tailwind%204-38B2AC?style=for-the-badge&logo=tailwind-css&logoColor=white)
+![Vite](https://img.shields.io/badge/Vite%208-646CFF?style=for-the-badge&logo=vite&logoColor=white)
 ![MIT License](https://img.shields.io/badge/License-MIT-green.svg?style=for-the-badge)
 
-Un clone funzionale e moderno dell'interfaccia di YouTube, costruito con SvelteKit, Tailwind CSS e l'API di YouTube.
+![L'applicazione in azione](./static/media/Animazione.gif)
 
 ---
 
-### ✨ Demo Live & Gif
+## Cosa fa
 
-**Link alla Demo:** [https://yt-clone-woad.vercel.app/](https://yt-clone-woad.vercel.app/)
+| Pagina                      | Contenuto                                                                                  |
+| --------------------------- | ------------------------------------------------------------------------------------------ |
+| `/`                         | Feed dei video popolari con chip per categoria e scroll infinito                           |
+| `/video/[videoId]`          | Player, dettagli, commenti e video correlati                                               |
+| `/search/[searchId]`        | Risultati paginati, filtrabili per tipo (video o canali), ordine, durata e data            |
+| `/channel/[channelId]`      | Canale, video (più recenti o più popolari) e scheda informazioni                           |
+| `/iscrizioni`               | Iscrizioni dell'utente, con disiscrizione                                                  |
+| `/playlist`                 | Le playlist dell'utente                                                                    |
+| `/playlist/[playlistId]`    | Video di una playlist, con scroll infinito                                                 |
+| `/playlist/liked`           | Video piaciuti, riordinabili con drag and drop                                             |
+| `/playlist/watch/[videoId]` | Riproduzione di una playlist (`?list=`, i piaciuti se manca), con coda e avanti e indietro |
 
-![GIF dell'applicazione in azione](./static/media/Animazione.gif)
+Login, like, iscrizioni e commenti passano da OAuth 2.0 e agiscono sul tuo account
+YouTube vero: l'app pubblica, modifica ed elimina commenti a tuo nome, e i bottoni
+di modifica compaiono solo sui commenti che hai scritto tu. Solo l'ordine della
+playlist resta nel browser.
 
----
+## Avvio locale
 
-## Outdated, new features
+Serve Node `>=22.12` (dichiarato in `engines`).
 
-## 🚀 Caratteristiche Principali
+```bash
+git clone https://github.com/imalbi/yt-clone.git
+cd yt-clone
+npm install
+cp .env.example .env   # riempi almeno YOUTUBE_API_KEY
+npm run dev
+```
 
-### Funzionalità Base
+### Variabili d'ambiente
 
-- **Homepage Dinamica:** Feed di video popolari caricati dall'API di YouTube.
-- **Pagina di Riproduzione Video:** Player video, dettagli del canale e informazioni sul video.
-- **Pagina di Ricerca:** Funzionalità di ricerca per trovare video specifici.
-- **Sezione Commenti:** Riceve dalle API i 20 commenti più recenti.
-- **Video Raccomandati:** Gestiti tramite dati statici, dato che le API relative non sono più disponibili o sono state limitate.
+Una sola è obbligatoria. Le altre tre abilitano le funzioni utente, e senza di
+esse l'app resta navigabile in sola lettura invece di rompersi: `/api/auth/login`
+risponde 503 con un messaggio, il resto funziona.
 
-### Esperienza Utente e Dettagli Tecnici di Rilievo
+| Variabile                  | Obbligatoria | A cosa serve                                 |
+| -------------------------- | ------------ | -------------------------------------------- |
+| `YOUTUBE_API_KEY`          | sì           | Video, ricerca, canali, commenti             |
+| `PUBLIC_YOUTUBE_CLIENT_ID` | no           | OAuth: login, like, iscrizioni               |
+| `YOUTUBE_CLIENT_SECRET`    | no           | OAuth                                        |
+| `PUBLIC_REDIRECT_URL`      | no           | OAuth, deve combaciare con l'URI autorizzato |
 
-- **Sidebar onclick:** Nella homepage è presente una sidebar che compare su richiesta, analogamente a quella di youtube.
-- **Animazioni a Cascata (Staggered Animations):** Gli elenchi di video non appaiono di colpo, ma entrano nella pagina con una fluida animazione a cascata (`fly`), uno dopo l'altro.
-- **Streaming dei Dati:** I commenti vengono caricati in modo indipendente dal video principale tramite streaming, permettendo alla pagina di essere interattiva più velocemente.
-- **Responsive Design Completo:** L'interfaccia è ottimizzata per un'esperienza perfetta su desktop, tablet e mobile, grazie a Tailwind CSS.
+La chiave API viene da [Google Cloud Console](https://console.cloud.google.com/apis/credentials)
+dopo aver abilitato "YouTube Data API v3" sul progetto. Le credenziali OAuth sono
+una cosa diversa: Credenziali → Crea credenziali → ID client OAuth 2.0 →
+Applicazione web, con `http://localhost:5173/api/auth/callback` fra gli URI di
+reindirizzamento autorizzati.
 
----
+`YOUTUBE_API_KEY` sta nel namespace privato di SvelteKit, quindi il build fallisce
+se finisce in codice client. Le tre variabili OAuth sono lette a runtime, il che è
+ciò che permette di compilare senza.
 
-## 🛠️ Stack Tecnologico
+## Comandi
 
-- **Framework:** **SvelteKit** & **Svelte 5 (Runes)**
-- **Linguaggio:** JavaScript / TypeScript
-- **Styling:** **Tailwind CSS**
-- **UI & Animazioni:**
-  - **Svelte Transitions** (per l'animazione `fly`)
-- **Build Tool:** Vite
-- **API:** YouTube Data API v3
+```bash
+npm run dev      # server di sviluppo
+npm run build    # build di produzione (adapter Vercel)
+npm run check    # svelte-check
+npm run lint     # eslint + prettier
+npm test         # vitest
+```
 
----
+Un hook pre-commit esegue eslint e prettier sui file in stage.
 
-## 🔧 Come Avviare il Progetto Localmente
+## Stack
 
-### Prerequisiti
+- **SvelteKit 3** (pre-release) con **Svelte 5** in modalità runes e le remote functions sperimentali
+- **TypeScript 6**, non la 7, perché `svelte-check` si ferma a `typescript@^6`
+- **Tailwind CSS 4**, configurato via CSS
+- **Vite 8**, con le icone compilate a build time da `unplugin-icons`
+- **TanStack Query 6** per lo stato lato client
+- **Zod 4** per validare le risposte dell'API
+- **Bits UI** per il drawer di navigazione
+- **Vitest** e Testing Library per i test di logica e di componente
 
-- Node.js (v18.x o superiore)
-- npm (o pnpm/yarn)
+## Note di implementazione
 
-### Installazione
+**I dati arrivano dal server, non dal browser.** I `load` di SvelteKit producono
+il payload SSR. Le liste paginate passano dagli endpoint `/api` e da TanStack
+Query, mentre le letture e le scritture dell'utente (like, iscrizioni, commenti)
+sono remote functions in `src/lib/youtube.remote.ts`, con una firma sola valida
+da entrambe le parti. La chiave API non raggiunge mai il browser e i cookie di
+sessione restano `httpOnly`.
 
-1.  **Clona la repository:**
+**Cache lato server contro la quota.** La Data API concede 10.000 unità al
+giorno e una manciata di ricariche le consuma. Le risposte pubbliche stanno in
+una cache in memoria con scadenza di cinque minuti: una ricerca ripetuta passa
+da ~500 ms a ~5 ms senza consumare quota. È una `Map` di processo, quindi su più
+istanze ognuna ha la sua copia; per una coerenza vera servirebbe Redis.
 
-    ```bash
-    git clone [https://github.com/imalbi/yt-clone.git](https://github.com/imalbi/yt-clone.git)
-    cd yt-clone
-    ```
+**Validazione al confine.** I JSON di YouTube passano da schemi Zod prima di
+diventare tipi dell'app. Gli elementi malformati vengono scartati singolarmente,
+perché in un feed di venti video uno rotto non deve far sparire gli altri
+diciannove; se cadono tutti, però, non è un elemento difettoso ma lo schema che
+non combacia più, e viene segnalato invece di restituire una lista vuota.
 
-2.  **Installa le dipendenze:**
+**Commenti come testo puro.** L'app chiede `textFormat=plainText` all'API, così
+i commenti non contengono mai markup e vengono resi con l'interpolazione normale
+di Svelte anziché con `{@html}`. I link li riconosce `linkify`, che accetta solo
+indirizzi http e https, e si aprono con `rel="noopener noreferrer nofollow"`.
 
-    ```bash
-    npm install
-    ```
+**Sessione risolta una volta sola.** `hooks.server.ts` rinnova l'access token
+quando è scaduto e mette utente e token in `locals`, così nessun endpoint rilegge
+i cookie a mano.
 
-3.  **Configura le variabili d'ambiente:**
-    Crea un file `.env` nella cartella principale del progetto e aggiungi la tua chiave API di YouTube.
+## Limiti noti
 
-    ```
-    PUBLIC_YOUTUBE_API_KEY="LA_TUA_CHIAVE_API_QUI"
-    ```
+- I video correlati sono i più popolari del momento, non correlati davvero:
+  `search.list` non accetta più `relatedToVideoId`.
+- L'ordine della playlist vive in localStorage, quindi non segue l'utente da un
+  browser all'altro.
+- La cache è per istanza.
+- SvelteKit 3, `adapter-vercel` 7 e le remote functions sono in pre-release o
+  sperimentali: le versioni sono fissate dal lockfile, ma un aggiornamento può
+  rompere l'app.
 
-4.  **Avvia il server di sviluppo:**
-    ```bash
-    npm run dev
-    ```
-    Apri [http://localhost:5173](http://localhost:5173) (o la porta indicata nel terminale) nel tuo browser.
+## Licenza
 
----
-
-## 🧠 Sfide Principali
-
-- **Orchestrazione di Chiamate API Complesse e Dipendenti**
-
-  - **Problema:** Nella pagina di ricerca con la sola API di ricerca non è possibile ottenere tutti i dati utili per emulare il comportamento dell'orginale.
-  - **Soluzione:** Ho strutturato le chiamate nella funzione load di SvelteKit per rispettare la catena di dipendenze in modo esplicito. Infine, ho aggregato i risultati in un'unico oggeto passato al frontend.
-
-- **Gestione Efficiente della Quota API (Caching)**
-  - **Problema:** L'API di YouTube ha una quota di utilizzo giornaliera molto stretta. Durante lo sviluppo e i test, ricaricare la stessa pagina più volte causava chiamate API ripetute per gli stessi dati, consumando rapidamente la quota e rallentando i caricamenti successivi.
-  - **Soluzione:** Ho implementato una semplice strategia di caching in memoria a livello server all'interno della funzione `load`. Ho utilizzato un `Map` per memorizzare le risposte delle API usando l'ID del video come chiave. Prima di effettuare una nuova chiamata `fetch`, controllo se i dati per quell'ID sono già presenti nella cache. In caso affermativo, restituisco i dati dalla cache, saltando la chiamata di rete. Questo ha ridotto drasticamente il consumo della quota API e ha reso la navigazione tra pagine già visitate istantanea.
-
----
-
-## 🚀 Possibili Miglioramenti Futuri
-
-- [x] Refactor dei Load
-- [ ] Refactor dei Componenti per separare in pezzi ancora più piccoli.
-- [x] Implementare Skeleton Screens
-- [x] Implementare un sistema di paginazione o "infinite scroll" per i commenti e i risultati di ricerca.
-- [x] Implementare Dark Mode
-
----
-
-## 📄 Licenza
-
-Distribuito sotto la Licenza MIT. Vedi `LICENSE` per maggiori informazioni.
+MIT, vedi [LICENSE](./LICENSE).

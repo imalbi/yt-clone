@@ -1,6 +1,5 @@
-export async function load({ cookies }) {
-	const userData = cookies.get('user_data');
-	return {
-		user: userData ? JSON.parse(userData) : null
-	};
-}
+import type { LayoutServerLoad } from './$types';
+
+export const load: LayoutServerLoad = async ({ locals }) => {
+	return { user: locals.user };
+};

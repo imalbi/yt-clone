@@ -1,32 +1,36 @@
 // src/routes/playlist/watch/[videoId]/+page.server.ts
-import * as apis from '$lib/api/youtube';
-import { redirect } from '@sveltejs/kit';
+import * as apis from '#lib/api/youtube.js';
+import { error, redirect } from '@sveltejs/kit';
 
-export async function load({ params, cookies }) {
-	try {
-		const accessToken = cookies.get('access_token');
+// La query string e' un confine di fiducia: un valore che non somiglia a un id
+// di playlist torna ai piaciuti invece di arrivare a Google.
+const PLAYLIST_ID = /^[\w-]{1,64}$/;
 
-		if (!accessToken) {
-			throw redirect(302, '/api/auth/login');
-		}
+export async function load({ params, locals, url }) {
+	const accessToken = locals.accessToken;
 
-		const videoId = params.videoId;
-		const videoPromise = apis.getVideoById(videoId);
-		const commentsPromise = apis.getComments(videoId);
-
-		return {
-			video: videoPromise,
-			comments: commentsPromise.then((data) => data.comments),
-			commentsNextPageToken: commentsPromise.then((data) => data.nextPageToken),
-			accessToken,
-			error: null
-		};
-	} catch (error) {
-		return {
-			video: Promise.resolve(null),
-			comments: Promise.resolve([]),
-			commentsNextPageToken: Promise.resolve(undefined),
-			error: error instanceof Error ? error.message : 'Errore sconosciuto'
-		};
+	if (!accessToken) {
+		redirect(302, '/api/auth/login');
 	}
+
+	const requested = url.searchParams.get('list');
+	const list = requested && PLAYLIST_ID.test(requested) ? requested : 'LL';
+
+	// 'LL' non la nomina `playlists.list`: il titolo si risolve solo per le altre,
+	// e una playlist che non esiste e' una pagina che non esiste.
+	let listTitle = 'Video piaciuti';
+	if (list !== 'LL') {
+		const playlist = await apis.getPlaylistById(list, accessToken);
+		if (!playlist) error(404, 'Playlist non trovata');
+		listTitle = playlist.title;
+	}
+
+	const videoId = params.videoId;
+	return {
+		videoId,
+		list,
+		listTitle,
+		video: apis.getVideoById(videoId),
+		commentsFirstPage: apis.getComments(videoId)
+	};
 }

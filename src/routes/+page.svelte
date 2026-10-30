@@ -1,59 +1,47 @@
 <script lang="ts">
-	import SkeletonHome from '$lib/components/SkeletonHome.svelte';
-	import VideoCard from '$lib/components/videoCard.svelte';
+	import { createInfiniteQuery } from '@tanstack/svelte-query';
+	import SkeletonHome from '#lib/components/SkeletonHome.svelte';
+	import CategoryChips from '#lib/components/CategoryChips.svelte';
+	import VideoCard from '#lib/components/videoCard.svelte';
 	import { inview } from 'svelte-inview';
+	import { popularVideosOptions } from '#lib/queries.js';
 
 	let { data } = $props();
-	let videos = $state<any[]>([]);
-	let nextPageToken: string | undefined = $state(undefined);
-	let isLoaded = $state(false);
-	let error = $state<string | null>(null);
 
-	async function loadMoreVideos() {
-		if (!nextPageToken) return;
+	// La chiave include la categoria: cambiando chip la lista riparte da sola e
+	// la precedente resta in cache per il tasto indietro.
+	const feed = createInfiniteQuery(() => popularVideosOptions(data.firstPage, data.categoryId));
 
-		const response = await fetch(`/api/videos?pageToken=${nextPageToken}`);
-		const newVideosData = await response.json();
-
-		videos = [...videos, ...newVideosData.videos];
-		nextPageToken = newVideosData.nextPageToken;
-	}
-
-	// Initialize data when promises resolve
-	$effect(() => {
-		data.videos
-			.then((awaitedVideos) => {
-				if (!isLoaded) {
-					videos = awaitedVideos;
-					isLoaded = true;
-				}
-			})
-			.catch((err) => {
-				error = err?.message || err;
-				isLoaded = true;
-			});
-
-		data.nextPageToken.then((token) => {
-			nextPageToken = token;
-		});
-	});
+	const videos = $derived(feed.data?.pages.flatMap((p) => p.videos) ?? []);
 </script>
 
 <main class="bg-background w-full md:p-4">
-	{#if error}
+	{#await data.categories then categories}
+		{#if categories.length > 0}
+			<CategoryChips {categories} selected={data.categoryId} />
+		{/if}
+	{/await}
+
+	{#if feed.isError}
 		<p>
-			<strong class="text-primary">Errore nel caricamento dei video: {error}</strong>
+			<strong class="text-primary">
+				Errore nel caricamento dei video: {feed.error.message}
+			</strong>
 		</p>
-	{:else if !isLoaded}
+	{:else if feed.isPending}
 		<SkeletonHome />
+	{:else if videos.length === 0}
+		<!-- Alcune categorie assegnabili non hanno una classifica: e' un caso
+		     normale, non un errore. -->
+		<p class="text-secondary p-8 text-center">Nessun video popolare in questa categoria.</p>
 	{:else}
 		<div class="mt-3 grid w-full grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
 			{#each videos as video (video.id)}
 				<VideoCard {video} />
 			{/each}
 		</div>
-		{#if nextPageToken}
-			<div use:inview={{ threshold: 0.1 }} oninview_enter={() => loadMoreVideos()}>
+		{#if feed.hasNextPage}
+			<div use:inview={{ threshold: 0.1 }} oninview_enter={() => feed.fetchNextPage()}>
 				<SkeletonHome />
 			</div>
 		{/if}

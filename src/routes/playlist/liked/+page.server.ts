@@ -1,12 +1,10 @@
 import { redirect } from '@sveltejs/kit';
+import type { PageServerLoad } from './$types';
 
-export async function load({ cookies }) {
-	const accessToken = cookies.get('access_token');
-
-	if (!accessToken) {
-		throw redirect(302, '/api/auth/login');
+export const load: PageServerLoad = async ({ locals }) => {
+	// Il token non viene piu' passato al client: l'endpoint lo legge da `locals`.
+	if (!locals.accessToken) {
+		redirect(302, '/api/auth/login');
 	}
-
-	// No need to fetch videos here anymore, the store handles it
-	return { accessToken };
-}
+	return {};
+};
