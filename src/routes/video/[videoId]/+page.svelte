@@ -4,7 +4,6 @@
 	import CommentsCard from '#lib/components/CommentsCard.svelte';
 	import RecommendedVideos from '#lib/components/RecommendedVideos.svelte';
 	import SkeletonRecommended from '#lib/components/SkeletonRecommended.svelte';
-	import SkeletonPlayer from '#lib/components/SkeletonPlayer.svelte';
 	import { fly } from 'svelte/transition';
 	import { inview } from 'svelte-inview';
 	import { relatedVideosOptions } from '#lib/queries.js';
@@ -23,13 +22,7 @@
 <main class="w-full p-4 xl:p-8">
 	<div class="grid grid-cols-1 gap-8 xl:grid-cols-[1fr_440px] xl:grid-rows-[auto_1fr]">
 		<div class="w-full xl:col-start-1 xl:row-start-1">
-			{#await data.video}
-				<SkeletonPlayer />
-			{:then video}
-				<VideoPlayer {video} user={data.user} />
-			{:catch error}
-				<p>Error loading video: {error.message}</p>
-			{/await}
+			<VideoPlayer video={data.video} user={data.user} />
 		</div>
 
 		<div
