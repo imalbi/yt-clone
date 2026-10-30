@@ -33,7 +33,7 @@ playlist resta nel browser.
 
 ## Avvio locale
 
-Serve Node `>=22.12` (dichiarato in `engines`).
+Serve Node `>=22.17` (dichiarato in `engines`).
 
 ```bash
 git clone https://github.com/imalbi/yt-clone.git
@@ -80,7 +80,7 @@ Un hook pre-commit esegue eslint e prettier sui file in stage.
 
 ## Stack
 
-- **SvelteKit 3** (pre-release) con **Svelte 5** in modalità runes e le remote functions sperimentali
+- **SvelteKit 3** con **Svelte 5** in modalità runes e le remote functions sperimentali
 - **TypeScript 6**, non la 7, perché `svelte-check` si ferma a `typescript@^6`
 - **Tailwind CSS 4**, configurato via CSS
 - **Vite 8**, con le icone compilate a build time da `unplugin-icons`
@@ -126,9 +126,9 @@ i cookie a mano.
 - L'ordine della playlist vive in localStorage, quindi non segue l'utente da un
   browser all'altro.
 - La cache è per istanza.
-- SvelteKit 3, `adapter-vercel` 7 e le remote functions sono in pre-release o
-  sperimentali: le versioni sono fissate dal lockfile, ma un aggiornamento può
-  rompere l'app.
+- Le remote functions di SvelteKit sono sperimentali: possono cambiare o sparire
+  anche in una versione minore, quindi un aggiornamento può rompere l'app. Le
+  versioni sono fissate dal lockfile.
 
 ## Licenza
 
