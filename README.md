@@ -8,7 +8,7 @@ Un clone dell'interfaccia di YouTube costruito con SvelteKit e la YouTube Data A
 ![Vite](https://img.shields.io/badge/Vite%208-646CFF?style=for-the-badge&logo=vite&logoColor=white)
 ![MIT License](https://img.shields.io/badge/License-MIT-green.svg?style=for-the-badge)
 
-![L'applicazione in azione](./static/media/Animazione.gif)
+![La home dell'applicazione](./static/media/home.png)
 
 ---
 
